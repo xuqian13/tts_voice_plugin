@@ -1,0 +1,44 @@
+# tts_voice_plugin - 自动生成的配置文件
+# GPT-SoVITS语音合成插件描述
+
+# 插件启用配置
+[plugin]
+# 是否启用插件
+enabled = true
+# 配置文件版本
+config_version = "1.0.0"
+
+# TTS语音合成相关配置
+[tts]
+# TTS请求超时时间（秒）
+timeout = 60
+# 最大文本长度
+max_text_length = 1000
+# TTS服务地址
+server = "http://127.0.0.1:9880"
+
+[tts_styles.default]
+
+refer_wav = "" # 默认参考音频路径
+
+prompt_text = "" # 默认参考文本
+
+prompt_language = "zh" # 默认参考文本语言
+
+gpt_weights = "" # 默认GPT模型权重路径
+
+sovits_weights = "" # 默认SoVITS模型权重路径
+
+[tts_styles."温柔"]
+refer_wav = ""
+prompt_text = ""
+prompt_language = "zh"
+gpt_weights = ""
+sovits_weights = ""
+
+[tts_styles."活泼"]
+refer_wav = ""
+prompt_text = ""
+prompt_language = "zh"
+gpt_weights = ""
+sovits_weights = ""
