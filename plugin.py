@@ -1,35 +1,59 @@
-from src.plugin_system import BaseAction, ActionActivationType, ChatMode
-from typing import Tuple, Dict, Any
+"""
+TTS Voice 插件
+
+基于 GPT-SoVITS 的文本转语音插件，支持多种语言和多风格语音合成。
+
+功能特性：
+- 支持中文、英文、日文等多种语言
+- 多种语音风格配置
+- Action自动触发和Command手动触发两种模式
+- 支持配置文件自定义设置
+- 智能语言检测和文本清理
+
+使用方法：
+- Action触发：发送包含"语音"、"说话"等关键词的消息
+- Command触发：/tts 你好世界 [风格]
+
+API接口：基于本地GPT-SoVITS服务
+"""
+
+from typing import List, Tuple, Type, Optional, Dict, Any
 import aiohttp
 import asyncio
+import os
+import re
+import tempfile
+from src.common.logger import get_logger
+from src.plugin_system.base.base_plugin import BasePlugin
+from src.plugin_system.apis.plugin_register_api import register_plugin
+from src.plugin_system.base.base_action import BaseAction, ActionActivationType, ChatMode
+from src.plugin_system.base.base_command import BaseCommand
+from src.plugin_system.base.component_types import ComponentInfo
 from src.plugin_system.base.config_types import ConfigField
 
+logger = get_logger("tts_voice_plugin")
 
+# ===== Action组件 =====
 class TTSVoiceAction(BaseAction):
-    """GPT-SoVITS 语音合成 Action 组件
+    """GPT-SoVITS 语音合成 Action 组件 - 智能语音合成"""
 
-    功能：将文本内容转换为语音并发送给用户，支持多风格、多语言。
-    适用场景：用户明确要求语音回复、特殊情境下增强表达效果。
-    """
+    action_name = "tts_voice_action"
+    action_description = "使用GPT-SoVITS将文本转换为语音并发送"
 
-    # === 激活控制 ===
-    focus_activation_type = ActionActivationType.KEYWORD  # 专注模式下关键词激活
-    normal_activation_type = ActionActivationType.KEYWORD  # 普通模式下关键词激活
-    mode_enable = ChatMode.ALL  # 所有模式下可用
-    parallel_action = False  # 不与其他Action并行执行
+    # 激活设置
+    focus_activation_type = ActionActivationType.KEYWORD
+    normal_activation_type = ActionActivationType.KEYWORD
+    mode_enable = ChatMode.ALL
+    parallel_action = False
 
-    # 关键词激活配置
+    # 关键词激活
     activation_keywords = [
         "语音", "说话", "朗读", "念一下", "读出来",
         "voice", "speak", "tts", "语音回复", "用语音说"
     ]
-    keyword_case_sensitive = False  # 不区分大小写
+    keyword_case_sensitive = False
 
-    # === 基本信息 ===
-    action_name = "tts_voice_action"
-    action_description = "使用GPT-SoVITS将文本转换为语音并发送"
-
-    # === 功能定义 ===
+    # Action参数
     action_parameters = {
         "text": "要转换为语音的文本内容",
         "text_language": "文本语言 (zh/en/ja)",
@@ -154,32 +178,47 @@ class TTSVoiceAction(BaseAction):
             raise Exception(f"TTS API调用异常: {str(e)}")
 
     async def execute(self) -> Tuple[bool, str]:
-        """执行语音合成Action"""
+        """执行GPT-SoVITS语音合成"""
         try:
-            import os
-            text = self.action_data.get("text", "")
+            # 获取参数
+            text = self.action_data.get("text", "").strip()
             text_language = self.action_data.get("text_language", "")
             voice_style = self.action_data.get("voice_style", "default")
-            if not text or len(text.strip()) == 0:
-                return False, "没有提供要转换的文本内容"
+
+            if not text:
+                await self.send_text("❌ 请提供要转换为语音的文本内容")
+                return False, "缺少文本内容"
+
             if len(text) > self.max_text_length * 2:
+                await self.send_text(f"❌ 文本过长，最大支持{self.max_text_length}字符")
                 return False, f"文本过长，最大支持{self.max_text_length}字符"
+
+            # 清理和处理文本
             clean_text = self._clean_text_for_tts(text)
             if not clean_text:
+                await self.send_text("❌ 文本处理后为空")
                 return False, "文本处理后为空"
+
+            # 检测语言
             if not text_language:
                 text_language = self._detect_language(clean_text)
+
+            # 选择语音风格
             style = self._choose_voice_style(clean_text, voice_style)
             if style not in self.tts_styles:
                 style = "default"
+
             server_config = self.tts_styles[style]
             refer_wav_path = self.action_data.get("refer_wav_path") or server_config.get("refer_wav_path")
             prompt_text = self.action_data.get("prompt_text") or server_config.get("prompt_text")
             prompt_language = self.action_data.get("prompt_language") or server_config.get("prompt_language")
 
-            # 只用 config.toml 中的 gpt_weights/sovits_weights
+            logger.info(f"{self.log_prefix} 开始GPT-SoVITS语音合成，文本：{clean_text[:50]}..., 风格：{style}")
+
+            # 切换模型权重（如果配置了）
             gpt_weights = server_config.get("gpt_weights")
             sovits_weights = server_config.get("sovits_weights")
+
             async def switch_model(weight_url, param_name):
                 if weight_url:
                     api_url = None
@@ -197,9 +236,11 @@ class TTSVoiceAction(BaseAction):
                                     except Exception:
                                         msg = await resp.text()
                                     raise Exception(f"切换模型失败: {param_name} {weight_url} {msg}")
+
             await switch_model(gpt_weights, "gpt_weights")
             await switch_model(sovits_weights, "sovits_weights")
 
+            # 调用TTS API生成语音
             audio_data = await self._call_tts_api(
                 server_config=server_config,
                 text=clean_text,
@@ -208,72 +249,98 @@ class TTSVoiceAction(BaseAction):
                 prompt_text=prompt_text if prompt_text else None,
                 prompt_language=prompt_language if prompt_language else None
             )
-            # 保存为本地文件
-            output_path = os.path.abspath("tts_voice_output.wav")
-            with open(output_path, "wb") as f:
-                f.write(audio_data)
-            await self.send_voice(output_path)
-            await self.store_action_info(
-                action_build_into_prompt=True,
-                action_prompt_display=f"将文本转换为语音并发送 (语言:{text_language}, 风格:{server_config['name']})",
-                action_done=True
-            )
-            return True, f"成功生成并发送语音，文本长度: {len(clean_text)}字符"
+
+            if audio_data:
+                # 保存音频文件
+                output_path = os.path.abspath("tts_voice_output.wav")
+                with open(output_path, "wb") as f:
+                    f.write(audio_data)
+
+                # 发送语音文件
+                await self.send_custom(message_type="voiceurl", content=output_path)
+                logger.info(f"{self.log_prefix} GPT-SoVITS语音发送成功")
+
+                await self.store_action_info(
+                    action_build_into_prompt=True,
+                    action_prompt_display=f"将文本转换为语音并发送 (语言:{text_language}, 风格:{server_config.get('name', style)})",
+                    action_done=True
+                )
+                return True, f"成功生成并发送语音，文本长度: {len(clean_text)}字符"
+            else:
+                await self.send_text("❌ 语音合成失败，请稍后重试")
+                return False, "语音合成失败"
+
         except Exception as e:
+            logger.error(f"{self.log_prefix} GPT-SoVITS语音合成出错: {e}")
+            await self.send_text(f"❌ 语音合成出错: {e}")
             await self.store_action_info(
                 action_build_into_prompt=True,
                 action_prompt_display=f"语音合成失败: {str(e)}",
                 action_done=False
             )
-            return False, f"语音合成失败: {str(e)}"
+            return False, f"语音合成出错: {str(e)}"
 
-    async def send_voice(self, file_path: str):
-        """直接发送本地音频文件路径 (自定义类型voiceurl)"""
-        await self.send_custom(message_type="voiceurl", content=file_path)
-
-
-from src.plugin_system import BasePlugin, register_plugin, ComponentInfo
+# ===== 插件注册 =====
 
 
 @register_plugin
 class TTSVoicePlugin(BasePlugin):
-    """GPT-SoVITS 语音合成插件"""
+    """GPT-SoVITS 语音合成插件 - 基于GPT-SoVITS的文本转语音插件"""
 
     plugin_name = "tts_voice_plugin"
-    plugin_description = "将文本转换为语音并发送，支持多风格多语言"
-    plugin_version = "1.0.0"
+    plugin_description = "基于GPT-SoVITS的文本转语音插件，支持多种语言和多风格语音合成"
+    plugin_version = "2.0.0"
     plugin_author = "靓仔"
     enable_plugin = True
     config_file_name = "config.toml"
+    dependencies = []  # 插件依赖列表
+    python_dependencies = ["aiohttp"]  # Python包依赖列表
 
+    # 配置节描述
     config_section_descriptions = {
-        "plugin": "插件启用配置",
+        "plugin": "插件基本配置",
+        "components": "组件启用控制",
         "tts": "TTS语音合成相关配置",
         "tts_styles": "TTS风格参数配置（每个分组为一种风格）"
     }
 
+    # 配置Schema定义
     config_schema = {
         "plugin": {
             "enabled": ConfigField(type=bool, default=True, description="是否启用插件"),
-            "config_version": ConfigField(type=str, default="1.0.0", description="配置文件版本"), 
+            "config_version": ConfigField(type=str, default="2.0.0", description="配置文件版本")
+        },
+        "components": {
+            "action_enabled": ConfigField(type=bool, default=True, description="是否启用Action组件")
         },
         "tts": {
-            "timeout": ConfigField(type=int, default=30, description="TTS请求超时时间（秒）"), 
-            "max_text_length": ConfigField(type=int, default=500, description="最大文本长度"), 
-            "server": ConfigField(type=str, default="http://127.0.0.1:9880", description="TTS服务全局地址"), 
+            "timeout": ConfigField(type=int, default=60, description="TTS请求超时时间（秒）"),
+            "max_text_length": ConfigField(type=int, default=1000, description="最大文本长度"),
+            "server": ConfigField(type=str, default="http://127.0.0.1:9880", description="TTS服务全局地址")
         },
         "tts_styles": {
             "default": {
-                "refer_wav": ConfigField(type=str, default="", description="默认参考音频路径"), 
-                "prompt_text": ConfigField(type=str, default="", description="默认参考文本"), 
-                "prompt_language": ConfigField(type=str, default="zh", description="默认参考文本语言"), 
-                "gpt_weights": ConfigField(type=str, default="", description="默认GPT模型权重路径"), 
-                "sovits_weights": ConfigField(type=str, default="", description="默认SoVITS模型权重路径"), 
+                "refer_wav": ConfigField(type=str, default="", description="默认参考音频路径"),
+                "prompt_text": ConfigField(type=str, default="", description="默认参考文本"),
+                "prompt_language": ConfigField(type=str, default="zh", description="默认参考文本语言"),
+                "gpt_weights": ConfigField(type=str, default="", description="默认GPT模型权重路径"),
+                "sovits_weights": ConfigField(type=str, default="", description="默认SoVITS模型权重路径")
             }
         }
     }
 
-    def get_plugin_components(self):
-        return [
-            (TTSVoiceAction.get_action_info(), TTSVoiceAction),
-        ]
+    def get_plugin_components(self) -> List[Tuple[ComponentInfo, Type]]:
+        """返回插件包含的组件列表"""
+        components = []
+
+        # 根据配置决定是否启用组件（如果get_config方法不可用，则默认启用）
+        try:
+            action_enabled = self.get_config("components.action_enabled", True)
+        except AttributeError:
+            # 如果get_config方法不存在，默认启用所有组件
+            action_enabled = True
+
+        if action_enabled:
+            components.append((TTSVoiceAction.get_action_info(), TTSVoiceAction))
+
+        return components

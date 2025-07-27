@@ -1,12 +1,17 @@
 # tts_voice_plugin - 自动生成的配置文件
-# GPT-SoVITS语音合成插件描述
+# 基于GPT-SoVITS的文本转语音插件，支持多种语言和多风格语音合成
 
-# 插件启用配置
+# 插件基本配置
 [plugin]
 # 是否启用插件
 enabled = true
 # 配置文件版本
-config_version = "1.0.0"
+config_version = "2.0.0"
+
+# 组件启用控制
+[components]
+# 是否启用Action组件
+action_enabled = true
 
 # TTS语音合成相关配置
 [tts]
@@ -19,9 +24,9 @@ server = "http://127.0.0.1:9880"
 
 [tts_styles.default]
 
-refer_wav = "" # 默认参考音频路径
+refer_wav = "神子.wav" # 默认参考音频路径
 
-prompt_text = "" # 默认参考文本
+prompt_text = "在这姑且属于人类的社会里，我也不过凭自己兴趣照做而已" # 默认参考文本
 
 prompt_language = "zh" # 默认参考文本语言
 
