@@ -26,7 +26,7 @@ import tempfile
 from src.common.logger import get_logger
 from src.plugin_system.base.base_plugin import BasePlugin
 from src.plugin_system.apis.plugin_register_api import register_plugin
-from src.plugin_system.base.base_action import BaseAction, ActionActivationType, ChatMode
+from src.plugin_system.base.base_action import BaseAction, ActionActivationType
 from src.plugin_system.base.base_command import BaseCommand
 from src.plugin_system.base.component_types import ComponentInfo
 from src.plugin_system.base.config_types import ConfigField
@@ -41,9 +41,7 @@ class TTSVoiceAction(BaseAction):
     action_description = "使用GPT-SoVITS将文本转换为语音并发送"
 
     # 激活设置
-    focus_activation_type = ActionActivationType.KEYWORD
-    normal_activation_type = ActionActivationType.KEYWORD
-    mode_enable = ChatMode.ALL
+    activation_type = ActionActivationType.KEYWORD
     parallel_action = False
 
     # 关键词激活
@@ -98,13 +96,15 @@ class TTSVoiceAction(BaseAction):
 
     def _detect_language(self, text: str) -> str:
         """智能检测文本语言"""
-        import re
         chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
         english_chars = len(re.findall(r'[a-zA-Z]', text))
         japanese_chars = len(re.findall(r'[\u3040-\u309f\u30a0-\u30ff]', text))
         total_chars = chinese_chars + english_chars + japanese_chars
+
         if total_chars == 0:
             return "zh"
+
+        # 根据字符占比判断语言
         if chinese_chars / total_chars > 0.3:
             return "zh"
         elif japanese_chars / total_chars > 0.3:
@@ -116,7 +116,7 @@ class TTSVoiceAction(BaseAction):
 
     def _clean_text_for_tts(self, text: str) -> str:
         """清理文本，使其更适合TTS"""
-        import re
+        # 移除特殊字符，只保留中日英文、数字和常用标点
         text = re.sub(r'[^\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ffa-zA-Z0-9\s，。！？、；：（）【】"\'.,!?;:()\[\]`-]', '', text)
         replacements = {
             'www': '哈哈哈',
@@ -136,10 +136,8 @@ class TTSVoiceAction(BaseAction):
     def _choose_voice_style(self, text: str, style_hint: str = None) -> str:
         """根据 style_hint 返回不同风格，若无匹配则返回 default"""
         if style_hint:
-            import re
             style_en = style_hint.strip().lower()
-            print(f"当前风格: {style_en}")
-            print(f"可用风格: {list(self.tts_styles.keys())}")
+            logger.debug(f"当前风格: {style_en}, 可用风格: {list(self.tts_styles.keys())}")
             if style_en in self.tts_styles:
                 return style_en
         return "default"
@@ -162,8 +160,8 @@ class TTSVoiceAction(BaseAction):
             # 自动拼接 /tts
             base_url = server_config["url"].rstrip("/")
             tts_url = base_url if base_url.endswith("/tts") else base_url + "/tts"
-            debug_msg = f"TTS API URL: {tts_url}\nTTS API JSON: {data}"
-            print(debug_msg)
+            logger.debug(f"TTS API URL: {tts_url}, 请求参数: {data}")
+
             async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.timeout)) as session:
                 async with session.post(tts_url, json=data) as response:
                     if response.status == 200:
@@ -186,17 +184,18 @@ class TTSVoiceAction(BaseAction):
             voice_style = self.action_data.get("voice_style", "default")
 
             if not text:
-                await self.send_text("❌ 请提供要转换为语音的文本内容")
+                await self.send_text("请提供要转换为语音的文本内容")
                 return False, "缺少文本内容"
 
+            # 检查文本长度
             if len(text) > self.max_text_length * 2:
-                await self.send_text(f"❌ 文本过长，最大支持{self.max_text_length}字符")
-                return False, f"文本过长，最大支持{self.max_text_length}字符"
+                await self.send_text(f"文本过长（{len(text)}字符），最大支持 {self.max_text_length} 字符")
+                return False, "文本过长"
 
             # 清理和处理文本
             clean_text = self._clean_text_for_tts(text)
             if not clean_text:
-                await self.send_text("❌ 文本处理后为空")
+                await self.send_text("文本处理后为空，请提供有效的文本内容")
                 return False, "文本处理后为空"
 
             # 检测语言
@@ -267,12 +266,12 @@ class TTSVoiceAction(BaseAction):
                 )
                 return True, f"成功生成并发送语音，文本长度: {len(clean_text)}字符"
             else:
-                await self.send_text("❌ 语音合成失败，请稍后重试")
+                await self.send_text("语音合成失败，请稍后重试")
                 return False, "语音合成失败"
 
         except Exception as e:
             logger.error(f"{self.log_prefix} GPT-SoVITS语音合成出错: {e}")
-            await self.send_text(f"❌ 语音合成出错: {e}")
+            await self.send_text(f"语音合成出错: {str(e)}")
             await self.store_action_info(
                 action_build_into_prompt=True,
                 action_prompt_display=f"语音合成失败: {str(e)}",
