@@ -1,0 +1,178 @@
+{
+  "manifest_version": 1,
+  "name": "统一TTS语音合成插件",
+  "version": "3.0.0",
+  "description": "统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS三种后端引擎，提供灵活的语音合成能力。",
+  "author": {
+    "name": "靓仔",
+    "url": "https://github.com/xuqian13"
+  },
+  "license": "AGPL-v3.0",
+  "homepage_url": "",
+  "repository_url": "https://github.com/xuqian13/unified_tts_plugin",
+  "keywords": [
+    "TTS",
+    "语音合成",
+    "文本转语音",
+    "AI语音",
+    "GSV2P",
+    "GPT-SoVITS",
+    "多后端",
+    "语音",
+    "朗读",
+    "音色",
+    "语音播报",
+    "MaiCore"
+  ],
+  "categories": [
+    "语音",
+    "AI",
+    "聊天增强",
+    "娱乐",
+    "Utility",
+    "Communication",
+    "Accessibility"
+  ],
+  "host_application": {
+    "min_version": "0.11.0",
+    "max_version": "1.0.0"
+  },
+  "default_locale": "zh-CN",
+  "plugin_info": {
+    "is_built_in": false,
+    "plugin_type": "general",
+    "components": [
+      {
+        "type": "action",
+        "name": "unified_tts_action",
+        "description": "统一TTS语音合成Action，支持三种后端引擎智能切换，LLM自主判断触发"
+      },
+      {
+        "type": "command",
+        "name": "unified_tts_command",
+        "description": "统一TTS命令，支持/tts、/voice、/gsv2p多种命令格式，灵活指定后端和音色"
+      }
+    ],
+    "features": [
+      "支持三种TTS后端：AI Voice、GSV2P、GPT-SoVITS",
+      "AI Voice: MaiCore内置，简单快速，22+预设音色",
+      "GSV2P: 云端API，高质量合成，丰富的调节参数",
+      "GPT-SoVITS: 本地服务，高度定制化，多风格支持",
+      "智能触发模式（LLM自主判断）和手动命令模式",
+      "概率控制机制，避免语音回复过于频繁",
+      "智能语言检测（中文/英文/日文）",
+      "文本自动清理和网络用语转换",
+      "完善的错误处理和重试机制",
+      "灵活的配置系统，支持各后端独立配置"
+    ],
+    "dependencies": {
+      "python": ["aiohttp"],
+      "system": [],
+      "plugins": []
+    },
+    "backend_info": {
+      "ai_voice": {
+        "provider": "MaiCore内置",
+        "endpoint": "AI_VOICE_SEND命令",
+        "authentication": "无需认证",
+        "limitations": "仅支持群聊使用",
+        "voices": "22+预设音色（小新、妲己、酥心御姐等）"
+      },
+      "gsv2p": {
+        "provider": "GSV2P云服务",
+        "endpoint": "https://gsv2p.acgnai.top/v1/audio/speech",
+        "authentication": "需要API Token",
+        "limitations": "API调用限制",
+        "features": "高质量合成、多语言支持、丰富参数调节"
+      },
+      "gpt_sovits": {
+        "provider": "本地GPT-SoVITS服务",
+        "endpoint": "http://127.0.0.1:9880",
+        "authentication": "无需认证",
+        "limitations": "需要本地部署服务",
+        "features": "高度定制化、多风格支持、模型权重切换"
+      }
+    }
+  },
+  "configuration": {
+    "config_file": "config.toml",
+    "auto_generate": true,
+    "sections": [
+      {
+        "name": "plugin",
+        "description": "插件基本配置"
+      },
+      {
+        "name": "general",
+        "description": "通用设置（默认后端、超时、文本长度等）"
+      },
+      {
+        "name": "components",
+        "description": "组件启用控制"
+      },
+      {
+        "name": "probability",
+        "description": "概率控制配置（避免语音回复过于频繁）"
+      },
+      {
+        "name": "ai_voice",
+        "description": "AI Voice后端配置（音色映射等）"
+      },
+      {
+        "name": "gsv2p",
+        "description": "GSV2P后端配置（API地址、Token、参数等）"
+      },
+      {
+        "name": "gpt_sovits",
+        "description": "GPT-SoVITS后端配置（服务地址、风格配置等）"
+      }
+    ]
+  },
+  "usage_examples": [
+    {
+      "type": "action",
+      "backend": "ai_voice",
+      "description": "LLM自动触发AI Voice语音回复",
+      "example": "用户：请用语音说\"你好世界\"\n机器人：[使用AI Voice自动生成语音文件并发送]"
+    },
+    {
+      "type": "command",
+      "backend": "ai_voice",
+      "description": "手动命令使用AI Voice",
+      "example": "/tts 你好世界 小新"
+    },
+    {
+      "type": "command",
+      "backend": "gsv2p",
+      "description": "手动命令使用GSV2P",
+      "example": "/gsv2p 今天天气不错"
+    },
+    {
+      "type": "command",
+      "backend": "gpt_sovits",
+      "description": "手动命令使用GPT-SoVITS",
+      "example": "/tts 测试一下 default gpt_sovits"
+    },
+    {
+      "type": "command",
+      "backend": "auto",
+      "description": "使用默认后端",
+      "example": "/tts 你好世界"
+    }
+  ],
+  "migration_info": {
+    "from_plugins": [
+      "ai_voice_plugin (v1.0.0)",
+      "gsv2p_tts_plugin (v1.0.0)",
+      "tts_voice_plugin (v2.0.0)"
+    ],
+    "migration_notes": [
+      "本插件整合了ai_voice_plugin、gsv2p_tts_plugin和旧版tts_voice_plugin的所有功能",
+      "配置文件需要重新生成，原配置需手动迁移",
+      "建议备份旧插件配置后再迁移",
+      "AI Voice音色映射保持兼容",
+      "GSV2P API配置需重新填写Token",
+      "GPT-SoVITS风格配置需要重新设置"
+    ]
+  }
+}
