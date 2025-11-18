@@ -155,7 +155,7 @@ api_token = "your_token_here"
 ```
 
 ### Q: 如何获取GSV2P API Token？
-**A:** 访问 [GSV2P官网](https://gsv2p.acgnai.top) 注册账号并获取Token。
+**A:** 访问 [GSV2P官网](https://tts.acgnai.top) 注册账号并获取Token。
 
 ### Q: GPT-SoVITS提示"API调用失败"？
 **A:** 确保本地GPT-SoVITS服务正在运行，并检查配置中的服务地址是否正确。
@@ -190,3 +190,4 @@ max_text_length = 1000  # 增加到1000字符
 ## 许可证
 
 本插件采用 AGPL-v3.0 许可证。
+
