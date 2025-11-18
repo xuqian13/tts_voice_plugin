@@ -1,0 +1,173 @@
+# tts_voice_plugin - 配置文件
+# 统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS三种后端引擎，提供灵活的语音合成能力。
+# 配置版本: 3.0.0
+
+# 插件基本配置
+[plugin]
+
+# 是否启用插件
+enabled = false
+
+# 配置文件版本
+config_version = "3.0.0"
+
+
+# 通用设置
+[general]
+
+# 默认TTS后端 (ai_voice/gsv2p/gpt_sovits)
+default_backend = "ai_voice"
+
+# 请求超时时间（秒）
+timeout = 60
+
+# 最大文本长度
+max_text_length = 500
+
+
+# 组件启用控制
+[components]
+
+# 是否启用Action组件
+action_enabled = true
+
+# 是否启用Command组件
+command_enabled = true
+
+
+# 概率控制配置
+[probability]
+
+# 是否启用概率控制
+enabled = true
+
+# 基础触发概率
+base_probability = 1.0
+
+# 关键词强制触发
+keyword_force_trigger = true
+
+# 强制触发关键词
+force_keywords = ["一定要用语音", "必须语音", "语音回复我", "务必用语音"]
+
+
+# AI Voice后端配置
+[ai_voice]
+
+# 默认AI语音音色
+default_character = "温柔妹妹"
+
+# 音色别名映射
+[ai_voice.alias_map]
+"小新" = "lucy-voice-laibixiaoxin"
+"猴哥" = "lucy-voice-houge"
+"四郎" = "lucy-voice-silang"
+"东北老妹儿" = "lucy-voice-guangdong-f1"
+"广西大表哥" = "lucy-voice-guangxi-m1"
+"妲己" = "lucy-voice-daji"
+"霸道总裁" = "lucy-voice-lizeyan"
+"酥心御姐" = "lucy-voice-suxinjiejie"
+"说书先生" = "lucy-voice-m8"
+"憨憨小弟" = "lucy-voice-male1"
+"憨厚老哥" = "lucy-voice-male3"
+"吕布" = "lucy-voice-lvbu"
+"元气少女" = "lucy-voice-xueling"
+"文艺少女" = "lucy-voice-f37"
+"磁性大叔" = "lucy-voice-male2"
+"邻家小妹" = "lucy-voice-female1"
+"低沉男声" = "lucy-voice-m14"
+"傲娇少女" = "lucy-voice-f38"
+"爹系男友" = "lucy-voice-m101"
+"暖心姐姐" = "lucy-voice-female2"
+"温柔妹妹" = "lucy-voice-f36"
+"书香少女" = "lucy-voice-f34"
+
+
+# GSV2P后端配置
+[gsv2p]
+
+# GSV2P API地址
+api_url = "https://gsv2p.acgnai.top/v1/audio/speech"
+
+# API认证Token
+api_token = ""
+
+# 默认音色
+default_voice = "原神-中文-派蒙_ZH"
+
+# API请求超时（秒）
+timeout = 60
+
+# TTS模型
+model = "tts-v4"
+
+# 音频格式
+response_format = "mp3"
+
+# 语音速度
+speed = 1.0
+
+# 文本语言
+text_lang = "中英混合"
+
+# 提示语言
+prompt_lang = "中文"
+
+# 情感
+emotion = "默认"
+
+# Top-K采样
+top_k = 10
+
+# Top-P采样
+top_p = 1.0
+
+# 温度参数
+temperature = 1.0
+
+# 文本分割方法
+text_split_method = "凑四句一切"
+
+# 批处理大小
+batch_size = 1
+
+# 批处理阈值
+batch_threshold = 0.75
+
+# 是否分桶
+split_bucket = true
+
+# 片段间隔
+fragment_interval = 0.3
+
+# 是否并行推理
+parallel_infer = true
+
+# 重复惩罚
+repetition_penalty = 1.35
+
+# 采样步数
+sample_steps = 16
+
+# 是否超分辨率
+if_sr = false
+
+# 随机种子
+seed = -1
+
+
+# GPT-SoVITS后端配置
+[gpt_sovits]
+
+# GPT-SoVITS服务地址
+server = "http://127.0.0.1:9880"
+
+# 语音风格配置
+[gpt_sovits.styles.default]
+refer_wav = ""
+prompt_text = ""
+prompt_language = "zh"
+gpt_weights = ""
+sovits_weights = ""
+
+
