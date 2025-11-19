@@ -108,7 +108,7 @@ class UnifiedTTSAction(BaseAction):
 
     action_parameters = {
         "text": "要转换为语音的文本内容（必填）",
-        "backend": "TTS后端引擎 (ai_voice/gsv2p/gpt_sovits，可选)",
+        "backend": "TTS后端引擎 (ai_voice/gsv2p/gpt_sovits，可选，建议省略让系统自动使用配置的默认后端)",
         "voice": "音色/风格参数（可选）"
     }
 
@@ -116,7 +116,8 @@ class UnifiedTTSAction(BaseAction):
         "当用户要求用语音回复时使用",
         "当回复简短问候语时使用（如早上好、晚安、你好等）",
         "当想让回复更活泼生动时可以使用",
-        "注意：回复内容过长时不适合用语音"
+        "注意：回复内容过长时不适合用语音",
+        "注意：backend参数建议省略，系统会自动使用配置的默认后端"
     ]
 
     associated_types = ["text", "command"]
@@ -304,7 +305,7 @@ class UnifiedTTSAction(BaseAction):
         """执行TTS语音合成"""
         try:
             text = self.action_data.get("text", "").strip()
-            backend = self.action_data.get("backend", "")
+            llm_backend = self.action_data.get("backend", "")  # LLM传入的后端
             voice = self.action_data.get("voice", "")
 
             if not text:
@@ -334,11 +335,22 @@ class UnifiedTTSAction(BaseAction):
                 await self.send_text("文本处理后为空")
                 return False, "文本处理后为空"
 
-            # 获取默认后端
-            if not backend:
-                backend = self.get_config("general.default_backend", "ai_voice")
+            # 【优先使用配置文件的默认后端】
+            config_backend = self.get_config("general.default_backend", "gsv2p")
 
-            logger.info(f"{self.log_prefix} 使用{backend}后端进行语音合成")
+            # 验证配置的后端是否有效
+            valid_backends = ["ai_voice", "gsv2p", "gpt_sovits"]
+            if config_backend not in valid_backends:
+                logger.warning(f"{self.log_prefix} 配置的默认后端 '{config_backend}' 无效，使用 gsv2p")
+                config_backend = "gsv2p"
+
+            backend = config_backend
+
+            # 记录后端选择来源
+            if llm_backend and llm_backend != backend:
+                logger.info(f"{self.log_prefix} LLM建议使用 {llm_backend}，但配置优先，使用 {backend} 后端")
+            else:
+                logger.info(f"{self.log_prefix} 使用配置的默认后端: {backend}")
 
             # 执行对应后端
             if backend == "ai_voice":
@@ -389,18 +401,41 @@ class UnifiedTTSCommand(BaseCommand):
         try:
             text = self.matched_groups.get("text", "").strip()
             voice = self.matched_groups.get("voice", "")
-            backend = self.matched_groups.get("backend", "")
+            user_backend = self.matched_groups.get("backend", "")  # 用户通过命令参数指定的后端
 
             if not text:
                 await self.send_text("请输入要转换为语音的文本内容")
                 return False, "缺少文本内容", True
 
-            # 根据命令前缀选择后端
+            # 【优先级：命令前缀 > 命令参数 > 配置文件】
+            backend = ""
+            backend_source = ""
+
+            # 1. 检查命令前缀（如 /gsv2p）
             raw_text = self.message.raw_message if self.message.raw_message else self.message.processed_plain_text
             if raw_text and raw_text.startswith("/gsv2p"):
                 backend = "gsv2p"
-            elif not backend:
-                backend = self.get_config("general.default_backend", "ai_voice")
+                backend_source = "命令前缀 /gsv2p"
+
+            # 2. 检查命令参数（如 /tts text voice gpt_sovits）
+            if not backend and user_backend:
+                valid_backends = ["ai_voice", "gsv2p", "gpt_sovits"]
+                if user_backend in valid_backends:
+                    backend = user_backend
+                    backend_source = f"命令参数 {user_backend}"
+                else:
+                    logger.warning(f"{self.log_prefix} 用户指定的后端 '{user_backend}' 无效")
+
+            # 3. 使用配置文件的默认值
+            if not backend:
+                config_backend = self.get_config("general.default_backend", "gsv2p")
+                valid_backends = ["ai_voice", "gsv2p", "gpt_sovits"]
+                if config_backend not in valid_backends:
+                    logger.warning(f"{self.log_prefix} 配置的默认后端 '{config_backend}' 无效，使用 gsv2p")
+                    backend = "gsv2p"
+                else:
+                    backend = config_backend
+                backend_source = "配置文件"
 
             # 清理文本
             max_length = self.get_config("general.max_text_length", 500)
@@ -410,7 +445,7 @@ class UnifiedTTSCommand(BaseCommand):
                 await self.send_text("文本处理后为空")
                 return False, "文本处理后为空", True
 
-            logger.info(f"{self.log_prefix} 执行TTS命令 (后端: {backend}, 音色: {voice})")
+            logger.info(f"{self.log_prefix} 执行TTS命令 (后端: {backend} [来源: {backend_source}], 音色: {voice})")
 
             # 执行对应后端
             if backend == "ai_voice":
@@ -615,10 +650,10 @@ class UnifiedTTSPlugin(BasePlugin):
             "command_enabled": ConfigField(type=bool, default=True, description="是否启用Command组件")
         },
         "probability": {
-            "enabled": ConfigField(type=bool, default=False, description="是否启用概率控制"),
-            "base_probability": ConfigField(type=float, default=0.3, description="基础触发概率"),
+            "enabled": ConfigField(type=bool, default=True, description="是否启用概率控制"),
+            "base_probability": ConfigField(type=float, default=1.0, description="基础触发概率"),
             "keyword_force_trigger": ConfigField(type=bool, default=True, description="关键词强制触发"),
-            "force_keywords": ConfigField(type=list, default=["一定要用语音", "必须语音", "语音回复我"], description="强制触发关键词")
+            "force_keywords": ConfigField(type=list, default=["一定要用语音", "必须语音", "语音回复我", "务必用语音"], description="强制触发关键词")
         },
         "ai_voice": {
             "default_character": ConfigField(type=str, default="温柔妹妹", description="默认AI语音音色"),
@@ -638,7 +673,7 @@ class UnifiedTTSPlugin(BasePlugin):
             "top_k": ConfigField(type=int, default=10, description="Top-K采样"),
             "top_p": ConfigField(type=float, default=1.0, description="Top-P采样"),
             "temperature": ConfigField(type=float, default=1.0, description="温度参数"),
-            "text_split_method": ConfigField(type=str, default="按标点符号切", description="文本分割方法"),
+            "text_split_method": ConfigField(type=str, default="凑四句一切", description="文本分割方法"),
             "batch_size": ConfigField(type=int, default=1, description="批处理大小"),
             "batch_threshold": ConfigField(type=float, default=0.75, description="批处理阈值"),
             "split_bucket": ConfigField(type=bool, default=True, description="是否分桶"),
