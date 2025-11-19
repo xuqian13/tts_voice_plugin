@@ -9,7 +9,7 @@
   },
   "license": "AGPL-v3.0",
   "homepage_url": "",
-  "repository_url": "https://github.com/xuqian13/unified_tts_plugin",
+  "repository_url": "https://github.com/xuqian13/tts_voice_plugin",
   "keywords": [
     "TTS",
     "语音合成",
