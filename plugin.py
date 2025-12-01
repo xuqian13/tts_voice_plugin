@@ -289,7 +289,13 @@ class UnifiedTTSAction(BaseAction):
                         with open(audio_path, "wb") as f:
                             f.write(audio_data)
 
-                        await self.send_custom(message_type="voiceurl", content=audio_path)
+                        # 将音频文件转换为base64编码以供发送
+                        import base64
+                        with open(audio_path, "rb") as audio_file:
+                            audio_bytes = audio_file.read()
+                            audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+
+                        await self.send_custom(message_type="voice", content=audio_base64)
                         logger.info(f"{self.log_prefix} GPT-SoVITS语音发送成功")
                         return True, f"成功发送GPT-SoVITS语音 (风格: {voice_style})"
                     else:
@@ -602,7 +608,13 @@ class UnifiedTTSCommand(BaseCommand):
                         with open(audio_path, "wb") as f:
                             f.write(audio_data)
 
-                        await self.send_custom(message_type="voiceurl", content=audio_path)
+                        # 将音频文件转换为base64编码以供发送
+                        import base64
+                        with open(audio_path, "rb") as audio_file:
+                            audio_bytes = audio_file.read()
+                            audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+
+                        await self.send_custom(message_type="voice", content=audio_base64)
                         return True, f"成功发送GPT-SoVITS语音 (风格: {voice_style})"
                     else:
                         return False, f"GPT-SoVITS API失败: {response.status}"
