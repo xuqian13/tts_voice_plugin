@@ -1,64 +1,108 @@
-# TTS语音合成插件
+# TTS 语音合成插件
 
-统一的文本转语音插件，支持三种后端引擎的灵活切换。
+MaiBot 的文本转语音插件，支持多种 TTS 后端。
 
-## 功能特性
+## 支持的后端
 
-### 三种后端引擎
+| 后端 | 说明 | 适用场景 |
+|------|------|----------|
+| AI Voice | MaiCore 内置，无需配置 | 仅群聊 |
+| GSV2P | 云端 API，需要 Token | 群聊/私聊 |
+| GPT-SoVITS | 本地服务，需自行部署 | 群聊/私聊 |
+| 豆包语音 | 火山引擎云服务，高质量 | 群聊/私聊 |
 
-| 后端 | 类型 | 特点 | 使用场景 |
-|------|------|------|----------|
-| **AI Voice** | MaiCore内置 | 简单快速，22种音色，无需配置 | 群聊语音（仅限群聊） |
-| **GSV2P** | 云端API | 高质量合成，丰富参数调节 | 私聊和群聊，需要API Token |
-| **GPT-SoVITS** | 本地服务 | 高度定制化，支持多风格 | 自建服务，需要本地部署 |
-
-### 两种触发方式
-
-1. **自动触发** - LLM智能判断，自动使用语音回复
-2. **手动触发** - 使用命令主动转换文本为语音
-
-## 快速开始
-
-### 1. 安装依赖
+## 安装
 
 ```bash
 pip install aiohttp
 ```
 
-### 2. 基础配置
+## 配置
 
-编辑 `config.toml`：
+编辑 `config.toml`，设置默认后端：
 
 ```toml
-[plugin]
-enabled = true
-
 [general]
-default_backend = "ai_voice"  # 默认使用AI Voice
-timeout = 60
-max_text_length = 500
+default_backend = "doubao"     # 可选：ai_voice / gsv2p / gpt_sovits / doubao
+audio_output_dir = ""          # 音频输出目录，留空使用项目根目录
+use_base64_audio = false       # 是否使用base64发送（备选方案）
 ```
 
-### 3. 配置后端
+### Docker环境配置说明
 
-#### 使用AI Voice（无需额外配置）
+**问题：** Docker环境中可能遇到音频上传失败或文件路径识别错误（如`识别URL失败`）
+
+**解决方案（按推荐顺序）：**
+
+#### 方案1：使用相对路径（推荐）
+
+```toml
+[general]
+audio_output_dir = ""  # 留空，默认使用项目根目录
+```
+
+音频文件将保存在项目根目录，OneBot/NapCat可以正确识别相对路径。
+
+#### 方案2：自定义输出目录
+
+```toml
+[general]
+audio_output_dir = "data/tts_audio"  # 相对路径，相对于项目根目录
+# 或
+audio_output_dir = "/app/data/audio" # 绝对路径
+```
+
+#### 方案3：使用base64编码（备选）
+
+如果路径方案都不生效，可启用base64发送：
+
+```toml
+[general]
+use_base64_audio = true  # 使用base64编码发送（会增加约33%数据大小）
+```
+
+### 豆包语音配置
+
+```toml
+[doubao]
+app_id = "你的APP_ID"
+access_key = "你的ACCESS_KEY"
+resource_id = "seed-tts-2.0"
+default_voice = "zh_female_vv_uranus_bigtts"
+```
+
+**预置音色：**
+
+| 音色名称 | voice_type |
+|----------|------------|
+| vivi 2.0 | zh_female_vv_uranus_bigtts |
+| 大壹 | zh_male_dayi_saturn_bigtts |
+| 黑猫侦探社咪仔 | zh_female_mizai_saturn_bigtts |
+
+**复刻音色：** 将 `resource_id` 改为 `seed-icl-2.0`，`default_voice` 填音色 ID（如 `S_xxxxxx`）
+
+凭证获取：[火山引擎控制台](https://console.volcengine.com/speech/service/8)
+
+### GSV2P 配置
+
+```toml
+[gsv2p]
+api_token = "你的Token"
+default_voice = "原神-中文-派蒙_ZH"
+```
+
+Token 获取：[https://tts.acgnai.top](https://tts.acgnai.top)
+
+### AI Voice 配置
 
 ```toml
 [ai_voice]
 default_character = "温柔妹妹"
-# 支持22种音色，详见配置文件
 ```
 
-#### 使用GSV2P（需要API Token）
+可用音色：小新、猴哥、妲己、酥心御姐、温柔妹妹、邻家小妹 等 22 种
 
-```toml
-[gsv2p]
-api_url = "https://gsv2p.acgnai.top/v1/audio/speech"
-api_token = "your_api_token_here"  # 填写你的API Token
-default_voice = "原神-中文-派蒙_ZH"
-```
-
-#### 使用GPT-SoVITS（需要本地服务）
+### GPT-SoVITS 配置
 
 ```toml
 [gpt_sovits]
@@ -67,127 +111,59 @@ server = "http://127.0.0.1:9880"
 [gpt_sovits.styles.default]
 refer_wav = "/path/to/reference.wav"
 prompt_text = "参考文本"
-prompt_language = "zh"
 ```
 
 ## 使用方法
 
 ### 命令触发
 
-```bash
-# 基础用法（使用默认后端和音色）
-/tts 你好世界
-
-# 指定音色
-/tts 今天天气不错 小新
-
-# 指定后端
-/tts 测试一下 温柔妹妹 ai_voice
-
-# 使用GSV2P
-/gsv2p 你好世界
-
-# 使用GSV2P指定音色
-/tts 你好 原神-中文-派蒙_ZH gsv2p
+```
+/tts 你好世界                    # 使用默认后端
+/tts 今天天气不错 小新            # 指定音色
+/gsv2p 你好世界                  # 使用 GSV2P
+/doubao 你好世界                 # 使用豆包
 ```
 
-### AI Voice 音色列表
+### 自动触发
 
-```
-小新、猴哥、四郎、东北老妹儿、广西大表哥
-妲己、霸道总裁、酥心御姐、说书先生、憨憨小弟
-憨厚老哥、吕布、元气少女、文艺少女、磁性大叔
-邻家小妹、低沉男声、傲娇少女、爹系男友、暖心姐姐
-温柔妹妹、书香少女
-```
-
-### LLM自动触发
-
-当LLM判断需要使用语音回复时，会自动触发。你可以在配置中调整概率：
+LLM 判断需要语音回复时会自动触发，可通过概率控制：
 
 ```toml
 [probability]
-enabled = true  # 启用概率控制
-base_probability = 0.3  # 30%概率触发
-keyword_force_trigger = true  # 关键词强制触发
-force_keywords = ["一定要用语音", "必须语音", "语音回复我"]
+enabled = true
+base_probability = 0.3  # 30% 概率
 ```
 
-## 配置说明
+## 项目结构
 
-### 通用配置
-
-```toml
-[general]
-default_backend = "ai_voice"  # 默认后端: ai_voice/gsv2p/gpt_sovits
-timeout = 60                  # 请求超时时间（秒）
-max_text_length = 500         # 最大文本长度
 ```
-
-### 组件控制
-
-```toml
-[components]
-action_enabled = true   # 启用自动触发（LLM判断）
-command_enabled = true  # 启用命令触发
-```
-
-### 概率控制
-
-```toml
-[probability]
-enabled = false              # 是否启用概率控制
-base_probability = 0.3       # 基础触发概率（0.0-1.0）
-keyword_force_trigger = true # 关键词强制触发
-force_keywords = ["一定要用语音", "必须语音"]
+tts_voice_plugin/
+├── plugin.py          # 插件入口
+├── config.toml        # 配置文件
+├── backends/          # 后端实现
+│   ├── ai_voice.py
+│   ├── gsv2p.py
+│   ├── gpt_sovits.py
+│   └── doubao.py
+└── utils/             # 工具函数
 ```
 
 ## 常见问题
 
-### Q: AI Voice提示"仅支持群聊"？
-**A:** AI Voice是MaiCore内置功能，只能在群聊中使用。如需私聊语音，请使用GSV2P或GPT-SoVITS后端。
+**Q: Docker环境中提示"文件处理失败 识别URL失败"？**
+A: 留空 `audio_output_dir` 配置项，插件将使用项目根目录保存音频（相对路径）。如仍有问题，可设置 `use_base64_audio = true` 使用base64编码发送。
 
-### Q: GSV2P报错"缺少API Token"？
-**A:** 在 `config.toml` 中配置你的API Token：
-```toml
-[gsv2p]
-api_token = "your_token_here"
-```
+**Q: AI Voice 提示"仅支持群聊"？**
+A: AI Voice 只能在群聊使用，私聊会自动切换到其他后端。
 
-### Q: 如何获取GSV2P API Token？
-**A:** 访问 [GSV2P官网](https://tts.acgnai.top) 注册账号并获取Token。
+**Q: 豆包语音怎么获取凭证？**
+A: 登录火山引擎控制台，开通语音合成服务获取。
 
-### Q: GPT-SoVITS提示"API调用失败"？
-**A:** 确保本地GPT-SoVITS服务正在运行，并检查配置中的服务地址是否正确。
+**Q: 文本太长被截断？**
+A: 修改 `config.toml` 中 `max_text_length = 1000`
 
-### Q: 语音不清晰或有问题？
-**A:**
-1. 调整GSV2P参数（`temperature`、`top_k`、`top_p`）
-2. 尝试更换音色
-3. 简化文本内容，避免特殊字符
+## 信息
 
-### Q: 如何切换默认后端？
-**A:** 修改 `config.toml` 中的 `default_backend`：
-```toml
-[general]
-default_backend = "gsv2p"  # 改为gsv2p
-```
-
-### Q: 文本被截断？
-**A:** 调整最大文本长度：
-```toml
-[general]
-max_text_length = 1000  # 增加到1000字符
-```
-
-## 技术支持
-
-- **版本**: 3.0.0
-- **作者**: 靓仔
-- **依赖**: aiohttp
-- **兼容**: MaiCore 0.9.0+
-
-## 许可证
-
-本插件采用 AGPL-v3.0 许可证。
-
+- 版本：3.1.0
+- 作者：靓仔
+- 许可：AGPL-v3.0

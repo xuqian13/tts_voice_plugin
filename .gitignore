@@ -22,3 +22,17 @@ env/
 *.log
 *.tmp
 .DS_Store
+
+# 生成的音频文件
+tts_*.mp3
+tts_*.wav
+tts_*.ogg
+
+# 数据目录（包含临时音频文件）
+data/
+
+# 规范工作流目录
+.spec-workflow/
+
+# Claude配置
+.claude/

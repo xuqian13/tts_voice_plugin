@@ -1,6 +1,6 @@
 # tts_voice_plugin - 配置文件
-# 统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS三种后端引擎，提供灵活的语音合成能力。
-# 配置版本: 3.0.0
+# 统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS、豆包语音四种后端引擎，提供灵活的语音合成能力。
+# 配置版本: 3.1.0
 
 # 插件基本配置
 [plugin]
@@ -9,20 +9,37 @@
 enabled = true
 
 # 配置文件版本
-config_version = "3.0.0"
+config_version = "3.1.0"
 
 
 # 通用设置
 [general]
 
-# 默认TTS后端 (ai_voice/gsv2p/gpt_sovits)
-default_backend = "ai_voice"
+# 默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao)
+default_backend = "doubao"
 
 # 请求超时时间（秒）
 timeout = 60
 
 # 最大文本长度
-max_text_length = 500
+max_text_length = 200
+
+# 是否使用replyer润色语音内容（让语音更自然，减少人机感）
+# 启用后，TTS会调用replyer重写文本，使回复风格与普通文字回复一致
+use_replyer_rewrite = true
+
+# 音频文件输出目录（用于解决Docker环境路径识别问题）
+# 留空时默认使用项目根目录
+# 支持相对路径和绝对路径：
+#   - 相对路径示例: "data/tts_audio" (相对于项目根目录)
+#   - 绝对路径示例: "/app/data/audio"
+# Docker环境建议使用相对路径，确保容器内外路径一致
+audio_output_dir = ""
+
+# 是否使用base64编码发送音频
+# true: 使用base64编码发送（兼容性最好，但会增加约33%数据大小）
+# false: 使用文件路径发送（配合audio_output_dir使用）
+use_base64_audio = true
 
 
 # 组件启用控制
@@ -55,7 +72,7 @@ force_keywords = ["一定要用语音", "必须语音", "语音回复我", "务�
 [ai_voice]
 
 # 默认AI语音音色
-default_character = "温柔妹妹"
+default_character = "邻家小妹"
 
 # 音色别名映射
 [ai_voice.alias_map]
@@ -110,56 +127,19 @@ speed = 1.0
 # 文本语言
 text_lang = "中英混合"
 
-# 提示语言
-prompt_lang = "中文"
-
 # 情感
 emotion = "默认"
 
-# Top-K采样
-top_k = 10
-
-# Top-P采样
-top_p = 1.0
-
-# 温度参数
-temperature = 1.0
-
-# 文本分割方法
-text_split_method = "凑四句一切"
-
-# 批处理大小
-batch_size = 1
-
-# 批处理阈值
-batch_threshold = 0.75
-
-# 是否分桶
-split_bucket = true
-
-# 片段间隔
-fragment_interval = 0.3
-
-# 是否并行推理
-parallel_infer = true
-
-# 重复惩罚
-repetition_penalty = 1.35
-
-# 采样步数
-sample_steps = 16
-
-# 是否超分辨率
-if_sr = false
-
-# 随机种子
-seed = -1
+# 注意：以下参数经测试会导致GSV2P API返回参数错误，已从代码中移除
+# prompt_lang, top_k, top_p, temperature, text_split_method, batch_size,
+# batch_threshold, split_bucket, fragment_interval, parallel_infer,
+# repetition_penalty, sample_steps, if_sr, seed
 
 
 # GPT-SoVITS后端配置
 [gpt_sovits]
 
-# GPT-SoVITS服务地址
+# GPT-SoVITS服务地址http://127.0.0.1:9880
 server = "http://127.0.0.1:9880"
 
 # 语音风格配置
@@ -171,3 +151,51 @@ gpt_weights = ""
 sovits_weights = ""
 
 
+# 豆包语音后端配置
+[doubao]
+
+# 豆包语音API地址
+api_url = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
+
+# 豆包APP ID（从火山引擎控制台获取）
+app_id = ""
+
+# 豆包Access Key（从火山引擎控制台获取）
+access_key = ""
+
+# 豆包Resource ID（从火山引擎控制台获取）
+resource_id = "seed-tts-2.0"
+
+# 默认音色
+# 预置音色示例: zh_female_vv_uranus_bigtts
+# 复刻音色格式: S_xxxxxx 或 icl_xxxxxx
+# 注意: 使用复刻音色时，resource_id 必须设置为 seed-icl-1.0 或 seed-icl-2.0
+default_voice = "zh_female_vv_uranus_bigtts"
+
+# API请求超时（秒）
+timeout = 60
+
+# 音频格式 (mp3/ogg_opus/pcm)
+audio_format = "mp3"
+
+# 采样率 (8000/16000/22050/24000/32000/44100/48000)
+sample_rate = 24000
+
+# 比特率 (建议64000-160000)
+bitrate = 128000
+
+# 语音速度（可选，范围通常为0.5-2.0）
+# speed = 1.0
+
+# 音量（可选）
+# volume = 1.0
+
+# 上下文辅助文本（可选，仅适用于豆包2.0模型，用于情感和语气调整）
+# 注意：只有第一个值有效，该字段不参与计费
+# 常见用法示例：
+#   语速调整: context_texts = ["你可以说慢一点吗？"]
+#   情绪调整: context_texts = ["你可以用特别特别痛心的语气说话吗？"]
+#   语气调整: context_texts = ["嗯，你的语气再欢乐一点"]
+#   音量调整: context_texts = ["你嗓门再小点。"]
+#   音感调整: context_texts = ["你能用骄傲的语气来说话吗？"]
+#context_texts = [""]

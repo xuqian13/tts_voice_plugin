@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "name": "统一TTS语音合成插件",
-  "version": "3.0.0",
-  "description": "统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS三种后端引擎，提供灵活的语音合成能力。",
+  "version": "3.1.0",
+  "description": "统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS、豆包语音四种后端引擎，提供灵活的语音合成能力。",
   "author": {
     "name": "靓仔",
     "url": "https://github.com/xuqian13"
@@ -17,6 +17,8 @@
     "AI语音",
     "GSV2P",
     "GPT-SoVITS",
+    "豆包",
+    "火山引擎",
     "多后端",
     "语音",
     "朗读",
@@ -45,19 +47,23 @@
       {
         "type": "action",
         "name": "unified_tts_action",
-        "description": "统一TTS语音合成Action，支持三种后端引擎智能切换，LLM自主判断触发"
+        "description": "统一TTS语音合成Action，支持四种后端引擎智能切换，LLM自主判断触发"
       },
       {
         "type": "command",
         "name": "unified_tts_command",
-        "description": "统一TTS命令，支持/tts、/voice、/gsv2p多种命令格式，灵活指定后端和音色"
+        "description": "统一TTS命令，支持/tts、/voice、/gsv2p、/doubao多种命令格式，灵活指定后端和音色"
       }
     ],
     "features": [
-      "支持三种TTS后端：AI Voice、GSV2P、GPT-SoVITS",
+      "支持四种TTS后端：AI Voice、GSV2P、GPT-SoVITS、豆包语音",
       "AI Voice: MaiCore内置，简单快速，22+预设音色",
       "GSV2P: 云端API，高质量合成，丰富的调节参数",
       "GPT-SoVITS: 本地服务，高度定制化，多风格支持",
+      "豆包语音: 字节跳动云服务，支持复刻音色和情感控制",
+      "模块化架构，后端独立实现，易于扩展",
+      "HTTP Session复用，提升性能",
+      "临时文件自动清理，避免并发冲突",
       "智能触发模式（LLM自主判断）和手动命令模式",
       "概率控制机制，避免语音回复过于频繁",
       "智能语言检测（中文/英文/日文）",
@@ -91,11 +97,19 @@
         "authentication": "无需认证",
         "limitations": "需要本地部署服务",
         "features": "高度定制化、多风格支持、模型权重切换"
+      },
+      "doubao": {
+        "provider": "字节跳动火山引擎",
+        "endpoint": "https://openspeech.bytedance.com/api/v3/tts/unidirectional",
+        "authentication": "需要app_id、access_key、resource_id",
+        "limitations": "需要火山引擎账号",
+        "features": "快速高质量、支持复刻音色、情感语气控制"
       }
     }
   },
   "configuration": {
     "config_file": "config.toml",
+    "config_template": "config.toml.example",
     "auto_generate": true,
     "sections": [
       {
@@ -125,15 +139,19 @@
       {
         "name": "gpt_sovits",
         "description": "GPT-SoVITS后端配置（服务地址、风格配置等）"
+      },
+      {
+        "name": "doubao",
+        "description": "豆包语音后端配置（火山引擎认证、音色、情感等）"
       }
     ]
   },
   "usage_examples": [
     {
       "type": "action",
-      "backend": "ai_voice",
-      "description": "LLM自动触发AI Voice语音回复",
-      "example": "用户：请用语音说\"你好世界\"\n机器人：[使用AI Voice自动生成语音文件并发送]"
+      "backend": "auto",
+      "description": "LLM自动触发语音回复",
+      "example": "用户：请用语音说\"你好世界\"\n机器人：[使用默认后端自动生成语音文件并发送]"
     },
     {
       "type": "command",
@@ -146,6 +164,12 @@
       "backend": "gsv2p",
       "description": "手动命令使用GSV2P",
       "example": "/gsv2p 今天天气不错"
+    },
+    {
+      "type": "command",
+      "backend": "doubao",
+      "description": "手动命令使用豆包语音",
+      "example": "/doubao 你好世界"
     },
     {
       "type": "command",
@@ -164,15 +188,19 @@
     "from_plugins": [
       "ai_voice_plugin (v1.0.0)",
       "gsv2p_tts_plugin (v1.0.0)",
-      "tts_voice_plugin (v2.0.0)"
+      "tts_voice_plugin (v2.0.0)",
+      "tts_voice_plugin (v3.0.0)"
     ],
     "migration_notes": [
       "本插件整合了ai_voice_plugin、gsv2p_tts_plugin和旧版tts_voice_plugin的所有功能",
+      "v3.1.0新增豆包语音后端支持",
+      "v3.1.0重构为模块化架构，提升代码可维护性",
       "配置文件需要重新生成，原配置需手动迁移",
       "建议备份旧插件配置后再迁移",
       "AI Voice音色映射保持兼容",
       "GSV2P API配置需重新填写Token",
-      "GPT-SoVITS风格配置需要重新设置"
+      "GPT-SoVITS风格配置需要重新设置",
+      "新增config.toml.example模板文件"
     ]
   }
 }
