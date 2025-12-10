@@ -37,10 +37,10 @@ class TTSTextUtils:
 
         Args:
             text: 原始文本
-            max_length: 最大长度限制
+            max_length: 最大长度限制（此参数已不用于硬截断，仅用于参考）
 
         Returns:
-            清理后的文本
+            清理后的文本（不会硬截断，保留完整内容以便上层决策）
         """
         if not text:
             return ""
@@ -51,10 +51,6 @@ class TTSTextUtils:
         # 替换常见网络用语
         for old, new in cls.NETWORK_SLANG_MAP.items():
             text = text.replace(old, new)
-
-        # 限制长度
-        if len(text) > max_length:
-            text = text[:max_length] + "。"
 
         return text.strip()
 

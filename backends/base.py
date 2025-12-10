@@ -83,6 +83,7 @@ class TTSBackendBase(ABC):
 
         # 检查是否使用base64发送
         use_base64 = self.get_config(ConfigKeys.GENERAL_USE_BASE64_AUDIO, False)
+        logger.debug(f"{self.log_prefix} 开始发送音频 (原始大小: {len(audio_data)}字节, 格式: {audio_format})")
 
         if use_base64:
             # 使用base64编码发送
@@ -90,10 +91,14 @@ class TTSBackendBase(ABC):
             if not base64_audio:
                 return TTSResult(False, "音频数据转base64失败", backend_name=self.backend_name)
 
+            logger.debug(f"{self.log_prefix} base64编码完成，准备通过send_custom发送")
             if self._send_custom:
                 await self._send_custom(message_type="voice", content=base64_audio)
+                logger.info(f"{self.log_prefix} 语音已通过send_custom发送 (base64模式, 音频大小: {len(audio_data)}字节)")
+            else:
+                logger.warning(f"{self.log_prefix} send_custom未设置，无法发送语音")
+                return TTSResult(False, "send_custom回调未设置", backend_name=self.backend_name)
 
-            logger.info(f"{self.log_prefix} 语音发送成功 (base64模式, 音频大小: {len(audio_data)}字节)")
             return TTSResult(
                 success=True,
                 message=f"成功发送{self.backend_name}语音{(' ('+voice_info+')') if voice_info else ''}, base64模式",
@@ -111,13 +116,17 @@ class TTSBackendBase(ABC):
             if not await TTSFileManager.write_audio_async(audio_path, audio_data):
                 return TTSResult(False, "保存音频文件失败", backend_name=self.backend_name)
 
+            logger.debug(f"{self.log_prefix} 音频文件已保存, 路径: {audio_path}")
             # 发送语音
             if self._send_custom:
                 await self._send_custom(message_type="voiceurl", content=audio_path)
+                logger.info(f"{self.log_prefix} 语音已通过send_custom发送 (文件路径模式, 路径: {audio_path})")
                 # 延迟清理临时文件
                 asyncio.create_task(TTSFileManager.cleanup_file_async(audio_path, delay=30))
+            else:
+                logger.warning(f"{self.log_prefix} send_custom未设置，无法发送语音")
+                return TTSResult(False, "send_custom回调未设置", backend_name=self.backend_name)
 
-            logger.info(f"{self.log_prefix} 语音发送成功 (文件路径模式, 路径: {audio_path})")
             return TTSResult(
                 success=True,
                 message=f"成功发送{self.backend_name}语音{(' ('+voice_info+')') if voice_info else ''}",

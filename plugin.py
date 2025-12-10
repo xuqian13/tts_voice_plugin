@@ -180,19 +180,31 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
 
     async def _get_final_text(self, raw_text: str, reason: str, use_replyer: bool) -> Tuple[bool, str]:
         """获取最终要转语音的文本（使用与正常回复一致的prompt参数）"""
+        max_text_length = self.get_config(ConfigKeys.GENERAL_MAX_TEXT_LENGTH, 200)
+
         if not use_replyer:
             if not raw_text:
                 return False, ""
             return True, raw_text
 
         try:
+            # 在生成时就注入长度限制，让LLM直接生成符合约束的文本
+            constraint_info = (
+                f"注意：生成的内容必须简洁，不超过{max_text_length}个字符"
+                f"（因为需要转换成语音播报），如果内容较长需要分段发送。"
+            )
+
             # 统一使用 generate_reply 以确保触发 POST_LLM 事件（日程注入）
             # rewrite_reply 不会触发 POST_LLM 事件，因此不适用
+            extra_info_parts = [constraint_info]
+            if raw_text:
+                extra_info_parts.append(f"期望的回复内容：{raw_text}")
+
             success, llm_response = await generator_api.generate_reply(
                 chat_stream=self.chat_stream,
                 reply_message=self.action_message,
                 reply_reason=reason,
-                extra_info=f"期望的回复内容：{raw_text}" if raw_text else "",
+                extra_info="\n".join(extra_info_parts),
                 request_type="tts_voice_plugin",
                 from_plugin=False  # 允许触发POST_LLM事件，使日程注入生效
             )
@@ -238,22 +250,26 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
                 )
                 return True, "概率检查未通过，已发送文字回复"
 
-            # 检查文本长度
-            if len(final_text) > self.max_text_length * 2:
-                logger.info(f"{self.log_prefix} 文本过长({len(final_text)}字符)，使用文字回复")
-                await self.send_text(final_text)
-                await self.store_action_info(
-                    action_build_into_prompt=True,
-                    action_prompt_display="回复了文字消息（文本过长不适合语音）",
-                    action_done=True
-                )
-                return True, "文本过长，已发送文字回复"
-
-            # 清理文本
+            # 清理文本（移除特殊字符，替换网络用语）
+            # 注意：长度应该由LLM在生成时就遵守，这里只做字符清理
             clean_text = TTSTextUtils.clean_text(final_text, self.max_text_length)
             if not clean_text:
                 await self.send_text("文本处理后为空")
                 return False, "文本处理后为空"
+
+            # 如果清理后的文本仍然超过限制，说明LLM未遵守约束
+            if len(clean_text) > self.max_text_length:
+                logger.warning(
+                    f"{self.log_prefix} LLM生成的文本超过长度限制 "
+                    f"({len(clean_text)} > {self.max_text_length}字符)，降级为文字回复"
+                )
+                await self.send_text(clean_text)
+                await self.store_action_info(
+                    action_build_into_prompt=True,
+                    action_prompt_display="回复了文字消息（内容超过语音限制）",
+                    action_done=True
+                )
+                return True, "内容超过语音长度限制，已改为文字回复"
 
             # 获取后端并执行
             backend = self._get_default_backend()
@@ -264,7 +280,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             if result.success:
                 await self.store_action_info(
                     action_build_into_prompt=True,
-                    action_prompt_display=f"使用{backend}后端将文本转换为语音并发送",
+                    action_prompt_display=f"[语音：{clean_text}]",
                     action_done=True
                 )
             else:
@@ -339,6 +355,15 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
                 await self.send_text("文本处理后为空")
                 return False, "文本处理后为空", True
 
+            # 检查长度限制
+            if len(clean_text) > max_length:
+                await self.send_text(
+                    f"文本过长（{len(clean_text)}字符），"
+                    f"超过语音合成限制（{max_length}字符），"
+                    f"已改为文字发送。\n\n{clean_text}"
+                )
+                return True, "文本过长，已改为文字发送", True
+
             logger.info(f"{self.log_prefix} 执行TTS命令 (后端: {backend} [来源: {backend_source}], 音色: {voice})")
 
             # 执行后端
@@ -390,7 +415,10 @@ class UnifiedTTSPlugin(BasePlugin):
                 description="默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao)"
             ),
             "timeout": ConfigField(type=int, default=60, description="请求超时时间（秒）"),
-            "max_text_length": ConfigField(type=int, default=200, description="最大文本长度"),
+            "max_text_length": ConfigField(
+                type=int, default=200,
+                description="最大文本长度（该限制会在调用LLM时注入到prompt中，让LLM直接生成符合长度的回复，而不是被动截断）"
+            ),
             "use_replyer_rewrite": ConfigField(
                 type=bool, default=True,
                 description="是否使用replyer润色语音内容"

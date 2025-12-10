@@ -172,7 +172,7 @@ class DoubaoBackend(TTSBackendBase):
         if context_texts:
             request_data["req_params"]["context_texts"] = context_texts
 
-        logger.info(f"{self.log_prefix} 豆包语音请求: text='{text[:50]}...', voice={voice}")
+        logger.info(f"{self.log_prefix} 豆包语音请求: text='{text[:50]}...' (共{len(text)}字符), voice={voice}")
 
         try:
             session_manager = await TTSSessionManager.get_instance()
@@ -183,7 +183,7 @@ class DoubaoBackend(TTSBackendBase):
                 backend_name="doubao",
                 timeout=timeout
             ) as response:
-                logger.info(f"{self.log_prefix} 豆包API响应状态: {response.status}")
+                logger.info(f"{self.log_prefix} 豆包API响应状态码: {response.status}")
 
                 if response.status == 200:
                     # 使用新的流式响应解析器
@@ -193,12 +193,16 @@ class DoubaoBackend(TTSBackendBase):
                     )
 
                     if error_msg:
+                        logger.error(f"{self.log_prefix} 豆包语音解析失败: {error_msg}")
                         return TTSResult(False, error_msg, backend_name=self.backend_name)
 
                     # 验证音频数据
                     is_valid, error_msg = TTSFileManager.validate_audio_data(audio_data)
                     if not is_valid:
+                        logger.warning(f"{self.log_prefix} 豆包音频数据验证失败: {error_msg}")
                         return TTSResult(False, f"豆包语音{error_msg}", backend_name=self.backend_name)
+
+                    logger.debug(f"{self.log_prefix} 豆包音频数据验证通过 (大小: {len(audio_data)}字节)")
 
                     # 使用统一的发送方法
                     audio_format = self.get_config(ConfigKeys.DOUBAO_AUDIO_FORMAT, "mp3")
@@ -210,7 +214,7 @@ class DoubaoBackend(TTSBackendBase):
                     )
                 else:
                     error_text = await response.text()
-                    logger.error(f"{self.log_prefix} 豆包语音API失败[{response.status}]: {error_text}")
+                    logger.error(f"{self.log_prefix} 豆包API请求失败[{response.status}]: {error_text[:200]}")
                     return TTSResult(
                         False,
                         f"豆包语音API调用失败: {response.status} - {error_text[:100]}",
@@ -218,7 +222,8 @@ class DoubaoBackend(TTSBackendBase):
                     )
 
         except asyncio.TimeoutError:
+            logger.error(f"{self.log_prefix} 豆包API请求超时 (配置超时: {timeout}秒)")
             return TTSResult(False, "豆包语音API调用超时", backend_name=self.backend_name)
         except Exception as e:
-            logger.error(f"{self.log_prefix} 豆包语音执行错误: {e}")
+            logger.error(f"{self.log_prefix} 豆包语音执行异常: {e}")
             return TTSResult(False, f"豆包语音执行错误: {e}", backend_name=self.backend_name)
