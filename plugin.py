@@ -1,11 +1,12 @@
 """
 统一TTS语音合成插件
-支持四种后端：AI Voice (MaiCore内置) / GSV2P (云API) / GPT-SoVITS (本地服务) / 豆包语音 (云API)
+支持五种后端：AI Voice (MaiCore内置) / GSV2P (云API) / GPT-SoVITS (本地服务) / 豆包语音 (云API) / CosyVoice (ModelScope Gradio)
 
-Version: 3.1.0
+Version: 3.2.0
 Author: 靓仔
 """
 
+import asyncio
 import random
 from typing import List, Tuple, Type, Optional
 
@@ -28,7 +29,7 @@ from .config_keys import ConfigKeys
 logger = get_logger("tts_voice_plugin")
 
 # 有效后端列表
-VALID_BACKENDS = ["ai_voice", "gsv2p", "gpt_sovits", "doubao"]
+VALID_BACKENDS = ["ai_voice", "gsv2p", "gpt_sovits", "doubao", "cosyvoice"]
 
 
 class TTSExecutorMixin:
@@ -137,7 +138,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
 
     action_parameters = {
         "text": "要转换为语音的文本内容（必填）",
-        "backend": "TTS后端引擎 (ai_voice/gsv2p/gpt_sovits/doubao，可选，建议省略让系统自动使用配置的默认后端)",
+        "backend": "TTS后端引擎 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice，可选，建议省略让系统自动使用配置的默认后端)",
         "voice": "音色/风格参数（可选）",
         "emotion": "情感/语气参数（可选，仅豆包后端有效）。支持：开心/兴奋/温柔/骄傲/生气/愤怒/伤心/失望/委屈/平静/严肃/疑惑/慢速/快速/小声/大声等"
     }
@@ -275,7 +276,55 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             backend = self._get_default_backend()
             logger.info(f"{self.log_prefix} 使用配置的默认后端: {backend}")
 
-            result = await self._execute_backend(backend, clean_text, voice, emotion)
+            # 检查是否启用分段发送
+            split_sentences = self.get_config(ConfigKeys.GENERAL_SPLIT_SENTENCES, True)
+            split_delay = self.get_config(ConfigKeys.GENERAL_SPLIT_DELAY, 0.3)
+
+            if split_sentences:
+                # 分段发送模式：将文本分割成句子，逐句发送语音
+                sentences = TTSTextUtils.split_sentences(clean_text)
+
+                if len(sentences) > 1:
+                    logger.info(f"{self.log_prefix} 分段发送模式：共 {len(sentences)} 句")
+
+                    success_count = 0
+                    all_sentences_text = []
+
+                    for i, sentence in enumerate(sentences):
+                        if not sentence.strip():
+                            continue
+
+                        logger.debug(f"{self.log_prefix} 发送第 {i+1}/{len(sentences)} 句: {sentence[:30]}...")
+                        result = await self._execute_backend(backend, sentence, voice, emotion)
+
+                        if result.success:
+                            success_count += 1
+                            all_sentences_text.append(sentence)
+                        else:
+                            logger.warning(f"{self.log_prefix} 第 {i+1} 句发送失败: {result.message}")
+
+                        # 句子之间添加延迟
+                        if i < len(sentences) - 1 and split_delay > 0:
+                            await asyncio.sleep(split_delay)
+
+                    # 记录动作信息
+                    if success_count > 0:
+                        display_text = "".join(all_sentences_text)
+                        await self.store_action_info(
+                            action_build_into_prompt=True,
+                            action_prompt_display=f"[语音：{display_text}]",
+                            action_done=True
+                        )
+                        return True, f"成功发送 {success_count}/{len(sentences)} 条语音"
+                    else:
+                        await self.send_text("语音合成失败")
+                        return False, "所有语音发送失败"
+                else:
+                    # 只有一句，正常发送
+                    result = await self._execute_backend(backend, clean_text, voice, emotion)
+            else:
+                # 原有逻辑：整段发送
+                result = await self._execute_backend(backend, clean_text, voice, emotion)
 
             if result.success:
                 await self.store_action_info(
@@ -300,16 +349,60 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
 
     command_name = "unified_tts_command"
     command_description = "将文本转换为语音，支持多种后端和音色"
-    command_pattern = r"^/(?:tts|voice|gsv2p|doubao)\s+(?P<text>.+?)(?:\s+(?P<voice>\S+))?(?:\s+(?P<backend>ai_voice|gsv2p|gpt_sovits|doubao))?$"
-    command_help = "将文本转换为语音。用法：/tts 你好世界 [音色] [后端]"
+    command_pattern = r"^/(?:tts|voice|gsv2p|gptsovits|doubao|cosyvoice)\s+(?P<text>.+?)(?:\s+-v\s+(?P<voice>\S+))?(?:\s+(?P<backend>ai_voice|gsv2p|gpt_sovits|doubao|cosyvoice))?$"
+    command_help = "将文本转换为语音。用法：/tts 你好世界 [-v 音色] [后端]"
     command_examples = [
         "/tts 你好，世界！",
-        "/tts 今天天气不错 小新",
-        "/tts 试试 温柔妹妹 ai_voice",
+        "/tts 今天天气不错 -v 小新",
+        "/gptsovits 你好世界 -v default",
+        "/cosyvoice 你好世界 -v 四川话",
+        "/tts 试试 -v 温柔妹妹 ai_voice",
         "/gsv2p 你好世界",
-        "/doubao 你好世界"
+        "/doubao 你好世界 -v 开心"
     ]
     intercept_message = True
+
+    async def _send_help(self):
+        """发送帮助信息"""
+        default_backend = self._get_default_backend()
+
+        help_text = """【TTS语音合成插件帮助】
+
+📝 基本语法：
+/tts <文本> [-v <音色>] [后端]
+
+🎯 快捷命令：
+/tts <文本>        使用默认后端
+/voice <文本>      使用 AI Voice
+/gsv2p <文本>      使用 GSV2P
+/gptsovits <文本>  使用 GPT-SoVITS
+/doubao <文本>     使用 豆包语音
+/cosyvoice <文本>  使用 CosyVoice
+
+🔊 可用后端：
+• ai_voice   - MaiCore内置（仅群聊）
+• gsv2p      - 云端API，高质量
+• gpt_sovits - 本地服务，可定制
+• doubao     - 火山引擎，支持情感
+• cosyvoice  - 阿里云，支持方言
+
+🎭 音色/情感参数（-v）：
+• AI Voice: 小新、温柔妹妹、霸道总裁、妲己 等22种
+• GSV2P: 原神-中文-派蒙_ZH 等（见API文档）
+• 豆包: 开心、生气、伤心、撒娇、严肃 等
+• CosyVoice: 广东话、四川话、东北话、开心、慢速 等
+
+📌 示例：
+/tts 你好世界
+/tts 今天真开心 -v 开心
+/gptsovits 这是本地语音合成
+/doubao 我生气了 -v 生气
+/cosyvoice 你好 -v 广东话
+/voice 测试一下 -v 温柔妹妹
+
+⚙️ 当前默认后端：""" + default_backend
+
+        await self.send_text(help_text)
 
     def _determine_backend(self, user_backend: str) -> Tuple[str, str]:
         """
@@ -321,10 +414,17 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
         # 1. 检查命令前缀
         raw_text = self.message.raw_message if self.message.raw_message else self.message.processed_plain_text
         if raw_text:
-            if raw_text.startswith("/gsv2p"):
-                return "gsv2p", "命令前缀 /gsv2p"
-            elif raw_text.startswith("/doubao"):
-                return "doubao", "命令前缀 /doubao"
+            # 命令前缀到后端的映射
+            prefix_backend_map = {
+                "/gsv2p": "gsv2p",
+                "/gptsovits": "gpt_sovits",
+                "/doubao": "doubao",
+                "/cosyvoice": "cosyvoice",
+                "/voice": "ai_voice",
+            }
+            for prefix, backend in prefix_backend_map.items():
+                if raw_text.startswith(prefix):
+                    return backend, f"命令前缀 {prefix}"
 
         # 2. 检查命令参数
         if user_backend and user_backend in VALID_BACKENDS:
@@ -339,6 +439,11 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
             text = self.matched_groups.get("text", "").strip()
             voice = self.matched_groups.get("voice", "")
             user_backend = self.matched_groups.get("backend", "")
+
+            # 处理帮助命令
+            if text.lower() == "help":
+                await self._send_help()
+                return True, "显示帮助信息", True
 
             if not text:
                 await self.send_text("请输入要转换为语音的文本内容")
@@ -367,7 +472,11 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
             logger.info(f"{self.log_prefix} 执行TTS命令 (后端: {backend} [来源: {backend_source}], 音色: {voice})")
 
             # 执行后端
-            result = await self._execute_backend(backend, clean_text, voice)
+            # 对于 CosyVoice 和豆包，voice 参数实际上是情感/方言
+            if backend in ["cosyvoice", "doubao"]:
+                result = await self._execute_backend(backend, clean_text, voice="", emotion=voice)
+            else:
+                result = await self._execute_backend(backend, clean_text, voice)
 
             if not result.success:
                 await self.send_text(f"语音合成失败: {result.message}")
@@ -401,18 +510,19 @@ class UnifiedTTSPlugin(BasePlugin):
         "ai_voice": "AI Voice后端配置",
         "gsv2p": "GSV2P后端配置",
         "gpt_sovits": "GPT-SoVITS后端配置",
-        "doubao": "豆包语音后端配置"
+        "doubao": "豆包语音后端配置",
+        "cosyvoice": "CosyVoice后端配置"
     }
 
     config_schema = {
         "plugin": {
             "enabled": ConfigField(type=bool, default=True, description="是否启用插件"),
-            "config_version": ConfigField(type=str, default="3.1.0", description="配置文件版本")
+            "config_version": ConfigField(type=str, default="3.2.0", description="配置文件版本")
         },
         "general": {
             "default_backend": ConfigField(
                 type=str, default="doubao",
-                description="默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao)"
+                description="默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice)"
             ),
             "timeout": ConfigField(type=int, default=60, description="请求超时时间（秒）"),
             "max_text_length": ConfigField(
@@ -430,6 +540,14 @@ class UnifiedTTSPlugin(BasePlugin):
             "use_base64_audio": ConfigField(
                 type=bool, default=True,
                 description="是否使用base64编码发送音频（备选方案）"
+            ),
+            "split_sentences": ConfigField(
+                type=bool, default=True,
+                description="是否分段发送语音（每句话单独发送一条语音，避免长语音播放问题）"
+            ),
+            "split_delay": ConfigField(
+                type=float, default=0.3,
+                description="分段发送时每条语音之间的延迟（秒）"
             )
         },
         "components": {
@@ -460,9 +578,7 @@ class UnifiedTTSPlugin(BasePlugin):
             "timeout": ConfigField(type=int, default=60, description="API请求超时（秒）"),
             "model": ConfigField(type=str, default="tts-v4", description="TTS模型"),
             "response_format": ConfigField(type=str, default="mp3", description="音频格式"),
-            "speed": ConfigField(type=float, default=1.0, description="语音速度"),
-            "text_lang": ConfigField(type=str, default="中英混合", description="文本语言"),
-            "emotion": ConfigField(type=str, default="默认", description="情感")
+            "speed": ConfigField(type=float, default=1.0, description="语音速度")
         },
         "gpt_sovits": {
             "server": ConfigField(
@@ -506,6 +622,35 @@ class UnifiedTTSPlugin(BasePlugin):
                 type=list, default=None,
                 description="上下文辅助文本（可选，仅豆包2.0模型）"
             )
+        },
+        "cosyvoice": {
+            "gradio_url": ConfigField(
+                type=str,
+                default="https://funaudiollm-fun-cosyvoice3-0-5b.ms.show/",
+                description="Gradio API地址"
+            ),
+            "default_mode": ConfigField(
+                type=str,
+                default="自然语言控制",
+                description="推理模式（3s极速复刻/自然语言控制）"
+            ),
+            "default_instruct": ConfigField(
+                type=str,
+                default="You are a helpful assistant. 请用广东话表达。<|endofprompt|>",
+                description="默认指令（用于自然语言控制模式）"
+            ),
+            "reference_audio": ConfigField(
+                type=str,
+                default="",
+                description="参考音频路径（用于3s极速复刻模式）"
+            ),
+            "prompt_text": ConfigField(
+                type=str,
+                default="",
+                description="提示文本（用于3s极速复刻模式）"
+            ),
+            "timeout": ConfigField(type=int, default=120, description="API请求超时（秒）"),
+            "audio_format": ConfigField(type=str, default="wav", description="音频格式")
         }
     }
 

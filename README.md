@@ -10,11 +10,12 @@ MaiBot 的文本转语音插件，支持多种 TTS 后端。
 | GSV2P | 云端 API，需要 Token | 群聊/私聊 |
 | GPT-SoVITS | 本地服务，需自行部署 | 群聊/私聊 |
 | 豆包语音 | 火山引擎云服务，高质量 | 群聊/私聊 |
+| CosyVoice | 阿里云 CosyVoice3，支持方言和声音克隆 | 群聊/私聊 |
 
 ## 安装
 
 ```bash
-pip install aiohttp
+pip install aiohttp gradio_client
 ```
 
 ## 配置
@@ -23,9 +24,11 @@ pip install aiohttp
 
 ```toml
 [general]
-default_backend = "doubao"     # 可选：ai_voice / gsv2p / gpt_sovits / doubao
+default_backend = "gsv2p"  # 可选：ai_voice / gsv2p / gpt_sovits / doubao / cosyvoice
 audio_output_dir = ""          # 音频输出目录，留空使用项目根目录
 use_base64_audio = false       # 是否使用base64发送（备选方案）
+split_sentences = true         # 是否分段发送语音（长文本逐句发送）
+split_delay = 0.3              # 分段发送间隔时间（秒）
 ```
 
 ### Docker环境配置说明
@@ -111,7 +114,37 @@ server = "http://127.0.0.1:9880"
 [gpt_sovits.styles.default]
 refer_wav = "/path/to/reference.wav"
 prompt_text = "参考文本"
+prompt_language = "zh"
+# 可选：动态模型切换（使用该风格时自动切换模型）
+gpt_weights = "/path/to/model.ckpt"
+sovits_weights = "/path/to/model.pth"
 ```
+
+### CosyVoice 配置
+
+```toml
+[cosyvoice]
+gradio_url = "https://funaudiollm-fun-cosyvoice3-0-5b.ms.show/"
+default_mode = "3s极速复刻"           # 或 "自然语言控制"
+default_instruct = "You are a helpful assistant. 请用广东话表达。<|endofprompt|>" # 只有自然语言控制模式才会生效，3s极速复刻模式下不生效
+reference_audio = "/path/to/ref.wav"  # 参考音频路径
+prompt_text = "参考音频对应的文本"      # 参考音频的对应文本
+timeout = 300                          # API超时（秒）
+```
+
+**支持的方言/情感/语速：**
+
+| 类型 | 可用选项 |
+|------|----------|
+| 方言 | 广东话、东北话、四川话、上海话、闽南话、山东话、陕西话、湖南话等17种 |
+| 情感 | 开心、伤心、生气 |
+| 语速 | 慢速、快速 |
+| 音量 | 大声、小声 |
+| 特殊风格 | 小猪佩奇、机器人 |
+
+**推理模式：**
+- `3s极速复刻`：需要提供参考音频进行声音克隆
+- `自然语言控制`：通过指令控制方言、情感、语速等
 
 ## 使用方法
 
@@ -122,6 +155,7 @@ prompt_text = "参考文本"
 /tts 今天天气不错 小新            # 指定音色
 /gsv2p 你好世界                  # 使用 GSV2P
 /doubao 你好世界                 # 使用豆包
+/cosyvoice 你好世界 四川话        # 使用 CosyVoice，四川话
 ```
 
 ### 自动触发
@@ -144,7 +178,8 @@ tts_voice_plugin/
 │   ├── ai_voice.py
 │   ├── gsv2p.py
 │   ├── gpt_sovits.py
-│   └── doubao.py
+│   ├── doubao.py
+│   └── cosyvoice.py
 └── utils/             # 工具函数
 ```
 
@@ -162,8 +197,23 @@ A: 登录火山引擎控制台，开通语音合成服务获取。
 **Q: 文本太长被截断？**
 A: 修改 `config.toml` 中 `max_text_length = 1000`
 
+## 更新日志
+
+### v3.2.0
+- 新增 CosyVoice 后端（阿里云 ModelScope，支持 17 种方言、3 秒声音克隆）
+- 新增分段发送功能（长文本自动分割逐句发送）
+- GPT-SoVITS 支持动态模型切换（在风格配置中指定 gpt_weights/sovits_weights）
+- GSV2P 后端新增重试机制（5 次重试，3 秒间隔）
+- 新增 `/cosyvoice` 命令
+- 新增 gradio_client 依赖
+
+### v3.1.0
+- 新增豆包语音后端（火山引擎云服务）
+- 重构为模块化架构
+- HTTP Session 复用优化
+
 ## 信息
 
-- 版本：3.1.0
+- 版本：3.2.0
 - 作者：靓仔
 - 许可：AGPL-v3.0

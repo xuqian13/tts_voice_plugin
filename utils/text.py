@@ -3,7 +3,7 @@
 """
 
 import re
-from typing import Optional
+from typing import Optional, List
 
 
 class TTSTextUtils:
@@ -45,12 +45,13 @@ class TTSTextUtils:
         if not text:
             return ""
 
+        # 注释掉文本清理功能，保留原始格式
         # 移除不支持的特殊字符
-        text = cls.SPECIAL_CHAR_PATTERN.sub('', text)
+        # text = cls.SPECIAL_CHAR_PATTERN.sub('', text)
 
         # 替换常见网络用语
-        for old, new in cls.NETWORK_SLANG_MAP.items():
-            text = text.replace(old, new)
+        # for old, new in cls.NETWORK_SLANG_MAP.items():
+        #     text = text.replace(old, new)
 
         return text.strip()
 
@@ -125,3 +126,56 @@ class TTSTextUtils:
             return alias_map[default]
 
         return default
+
+    @classmethod
+    def split_sentences(cls, text: str, min_length: int = 2) -> List[str]:
+        """
+        将文本分割成句子
+
+        Args:
+            text: 待分割文本
+            min_length: 最小句子长度，过短的句子会合并到前一句
+
+        Returns:
+            句子列表
+        """
+        if not text:
+            return []
+
+        # 使用中英文标点分割
+        # 保留分隔符以便后续处理
+        pattern = r'([。！？!?；;])'
+        parts = re.split(pattern, text)
+
+        sentences = []
+        current = ""
+
+        for i, part in enumerate(parts):
+            if not part:
+                continue
+
+            # 如果是标点符号，附加到当前句子
+            if re.match(pattern, part):
+                current += part
+            else:
+                # 如果当前句子不为空，先保存
+                if current.strip():
+                    sentences.append(current.strip())
+                current = part
+
+        # 处理最后一段
+        if current.strip():
+            sentences.append(current.strip())
+
+        # 合并过短的句子
+        if min_length > 0 and len(sentences) > 1:
+            merged = []
+            for sent in sentences:
+                if merged and len(sent) < min_length:
+                    # 合并到前一句
+                    merged[-1] += sent
+                else:
+                    merged.append(sent)
+            sentences = merged
+
+        return sentences

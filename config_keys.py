@@ -18,6 +18,8 @@ class ConfigKeys:
     GENERAL_USE_REPLYER_REWRITE = "general.use_replyer_rewrite"
     GENERAL_AUDIO_OUTPUT_DIR = "general.audio_output_dir"
     GENERAL_USE_BASE64_AUDIO = "general.use_base64_audio"
+    GENERAL_SPLIT_SENTENCES = "general.split_sentences"
+    GENERAL_SPLIT_DELAY = "general.split_delay"
 
     # ========== Components 组件配置 ==========
     COMPONENTS_ACTION_ENABLED = "components.action_enabled"
@@ -41,8 +43,6 @@ class ConfigKeys:
     GSV2P_MODEL = "gsv2p.model"
     GSV2P_RESPONSE_FORMAT = "gsv2p.response_format"
     GSV2P_SPEED = "gsv2p.speed"
-    GSV2P_TEXT_LANG = "gsv2p.text_lang"
-    GSV2P_EMOTION = "gsv2p.emotion"
 
     # ========== GPT-SoVITS 配置 ==========
     GPT_SOVITS_SERVER = "gpt_sovits.server"
@@ -61,3 +61,12 @@ class ConfigKeys:
     DOUBAO_SPEED = "doubao.speed"
     DOUBAO_VOLUME = "doubao.volume"
     DOUBAO_CONTEXT_TEXTS = "doubao.context_texts"
+
+    # ========== CosyVoice 配置 ==========
+    COSYVOICE_GRADIO_URL = "cosyvoice.gradio_url"
+    COSYVOICE_DEFAULT_MODE = "cosyvoice.default_mode"
+    COSYVOICE_DEFAULT_INSTRUCT = "cosyvoice.default_instruct"
+    COSYVOICE_REFERENCE_AUDIO = "cosyvoice.reference_audio"
+    COSYVOICE_PROMPT_TEXT = "cosyvoice.prompt_text"
+    COSYVOICE_TIMEOUT = "cosyvoice.timeout"
+    COSYVOICE_AUDIO_FORMAT = "cosyvoice.audio_format"

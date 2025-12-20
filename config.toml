@@ -1,6 +1,6 @@
 # tts_voice_plugin - 配置文件
-# 统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS、豆包语音四种后端引擎，提供灵活的语音合成能力。
-# 配置版本: 3.1.0
+# 统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS、豆包语音、CosyVoice五种后端引擎，提供灵活的语音合成能力。
+# 配置版本: 3.2.0
 
 # 插件基本配置
 [plugin]
@@ -9,37 +9,35 @@
 enabled = true
 
 # 配置文件版本
-config_version = "3.1.0"
+config_version = "3.2.0"
 
 
 # 通用设置
 [general]
 
-# 默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao)
-default_backend = "doubao"
+# 默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice)
+default_backend = "gsv2p"
 
 # 请求超时时间（秒）
 timeout = 60
 
-# 最大文本长度
+# 最大文本长度（该限制会在调用LLM时注入到prompt中，让LLM直接生成符合长度的回复，而不是被动截断）
 max_text_length = 200
 
-# 是否使用replyer润色语音内容（让语音更自然，减少人机感）
-# 启用后，TTS会调用replyer重写文本，使回复风格与普通文字回复一致
+# 是否使用replyer润色语音内容
 use_replyer_rewrite = true
 
-# 音频文件输出目录（用于解决Docker环境路径识别问题）
-# 留空时默认使用项目根目录
-# 支持相对路径和绝对路径：
-#   - 相对路径示例: "data/tts_audio" (相对于项目根目录)
-#   - 绝对路径示例: "/app/data/audio"
-# Docker环境建议使用相对路径，确保容器内外路径一致
+# 音频文件输出目录（支持相对路径和绝对路径，留空使用项目根目录）
 audio_output_dir = ""
 
 # 是否使用base64编码发送音频
-# true: 使用base64编码发送（兼容性最好，但会增加约33%数据大小）
-# false: 使用文件路径发送（配合audio_output_dir使用）
 use_base64_audio = true
+
+# 是否分段发送语音（长文本自动分割成句子逐句发送）
+split_sentences = true
+
+# 分段发送间隔时间（秒）
+split_delay = 0.3
 
 
 # 组件启用控制
@@ -56,10 +54,10 @@ command_enabled = true
 [probability]
 
 # 是否启用概率控制
-enabled = true
+enabled = false
 
 # 基础触发概率
-base_probability = 1.0
+base_probability = 1
 
 # 关键词强制触发
 keyword_force_trigger = true
@@ -74,30 +72,30 @@ force_keywords = ["一定要用语音", "必须语音", "语音回复我", "务�
 # 默认AI语音音色
 default_character = "邻家小妹"
 
-# 音色别名映射
+# 音色别名映射（别名 -> lucy-voice-xxx）
 [ai_voice.alias_map]
-"小新" = "lucy-voice-laibixiaoxin"
-"猴哥" = "lucy-voice-houge"
-"四郎" = "lucy-voice-silang"
-"东北老妹儿" = "lucy-voice-guangdong-f1"
-"广西大表哥" = "lucy-voice-guangxi-m1"
-"妲己" = "lucy-voice-daji"
-"霸道总裁" = "lucy-voice-lizeyan"
-"酥心御姐" = "lucy-voice-suxinjiejie"
-"说书先生" = "lucy-voice-m8"
-"憨憨小弟" = "lucy-voice-male1"
-"憨厚老哥" = "lucy-voice-male3"
-"吕布" = "lucy-voice-lvbu"
-"元气少女" = "lucy-voice-xueling"
-"文艺少女" = "lucy-voice-f37"
-"磁性大叔" = "lucy-voice-male2"
-"邻家小妹" = "lucy-voice-female1"
-"低沉男声" = "lucy-voice-m14"
-"傲娇少女" = "lucy-voice-f38"
-"爹系男友" = "lucy-voice-m101"
-"暖心姐姐" = "lucy-voice-female2"
-"温柔妹妹" = "lucy-voice-f36"
-"书香少女" = "lucy-voice-f34"
+小新 = "lucy-voice-laibixiaoxin"
+猴哥 = "lucy-voice-houge"
+四郎 = "lucy-voice-silang"
+东北老妹儿 = "lucy-voice-guangdong-f1"
+广西大表哥 = "lucy-voice-guangxi-m1"
+妲己 = "lucy-voice-daji"
+霸道总裁 = "lucy-voice-lizeyan"
+酥心御姐 = "lucy-voice-suxinjiejie"
+说书先生 = "lucy-voice-m8"
+憨憨小弟 = "lucy-voice-male1"
+憨厚老哥 = "lucy-voice-male3"
+吕布 = "lucy-voice-lvbu"
+元气少女 = "lucy-voice-xueling"
+文艺少女 = "lucy-voice-f37"
+磁性大叔 = "lucy-voice-male2"
+邻家小妹 = "lucy-voice-female1"
+低沉男声 = "lucy-voice-m14"
+傲娇少女 = "lucy-voice-f38"
+爹系男友 = "lucy-voice-m101"
+暖心姐姐 = "lucy-voice-female2"
+温柔妹妹 = "lucy-voice-f36"
+书香少女 = "lucy-voice-f34"
 
 
 # GSV2P后端配置
@@ -124,31 +122,37 @@ response_format = "mp3"
 # 语音速度
 speed = 1.0
 
-# 文本语言
-text_lang = "中英混合"
-
-# 情感
-emotion = "默认"
-
-# 注意：以下参数经测试会导致GSV2P API返回参数错误，已从代码中移除
-# prompt_lang, top_k, top_p, temperature, text_split_method, batch_size,
-# batch_threshold, split_bucket, fragment_interval, parallel_infer,
-# repetition_penalty, sample_steps, if_sr, seed
-
 
 # GPT-SoVITS后端配置
 [gpt_sovits]
 
-# GPT-SoVITS服务地址http://127.0.0.1:9880
-server = "http://127.0.0.1:9880"
+# GPT-SoVITS服务地址
+server = "https://127.0.0.1:9880"
 
-# 语音风格配置
+# 语音风格配置（可添加多个风格）
+# 每个风格需要配置：
+#   - refer_wav: 参考音频路径（必填）
+#   - prompt_text: 参考文本（必填）
+#   - prompt_language: 参考语言 zh/en/ja（可选，默认zh）
+#   - gpt_weights: GPT模型权重路径（可选，用于动态切换模型）
+#   - sovits_weights: SoVITS模型权重路径（可选，用于动态切换模型）
+
 [gpt_sovits.styles.default]
-refer_wav = ""
-prompt_text = ""
+refer_wav = "/workspace/gpt-sovits/嘉然/啊，不可以，太贪心了，贪心和真心你们选一个吧.wav"
+prompt_text = "啊，不可以，太贪心了，贪心和真心你们选一个吧"
 prompt_language = "zh"
-gpt_weights = ""
-sovits_weights = ""
+# GPT模型权重路径（可选，配置后会在使用该风格时自动切换模型）
+gpt_weights = "/workspace/gpt-sovits/嘉然/嘉然GPT.ckpt"
+# SoVITS模型权重路径（可选，配置后会在使用该风格时自动切换模型）
+sovits_weights = "/workspace/gpt-sovits/嘉然/嘉然SoVITS.pth"
+
+# 可以添加更多风格，例如：
+[gpt_sovits.styles.happy]
+refer_wav = "/workspace/gpt-sovits/v4/可莉_ZH/reference_audios/中文/emotions/【默认】玩得太开心，忘、忘在脑后了….wav"
+prompt_text = "玩得太开心，忘、忘在脑后了…"
+prompt_language = "zh"
+gpt_weights = "/workspace/gpt-sovits/v4/可莉_ZH/可莉_ZH-e10.ckpt"
+sovits_weights = "/workspace/gpt-sovits/v4/可莉_ZH/可莉_ZH_e10_s530_l32.pth"
 
 
 # 豆包语音后端配置
@@ -157,45 +161,60 @@ sovits_weights = ""
 # 豆包语音API地址
 api_url = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"
 
-# 豆包APP ID（从火山引擎控制台获取）
+# 豆包APP ID
 app_id = ""
 
-# 豆包Access Key（从火山引擎控制台获取）
+# 豆包Access Key
 access_key = ""
 
-# 豆包Resource ID（从火山引擎控制台获取）
-resource_id = "seed-tts-2.0"
+# 豆包Resource ID
+resource_id = ""
 
 # 默认音色
-# 预置音色示例: zh_female_vv_uranus_bigtts
-# 复刻音色格式: S_xxxxxx 或 icl_xxxxxx
-# 注意: 使用复刻音色时，resource_id 必须设置为 seed-icl-1.0 或 seed-icl-2.0
-default_voice = "zh_female_vv_uranus_bigtts"
+default_voice = ""
 
 # API请求超时（秒）
 timeout = 60
 
-# 音频格式 (mp3/ogg_opus/pcm)
+# 音频格式
 audio_format = "mp3"
 
-# 采样率 (8000/16000/22050/24000/32000/44100/48000)
+# 采样率
 sample_rate = 24000
 
-# 比特率 (建议64000-160000)
+# 比特率
 bitrate = 128000
 
-# 语音速度（可选，范围通常为0.5-2.0）
+# 语音速度（可选）
 # speed = 1.0
 
 # 音量（可选）
 # volume = 1.0
 
-# 上下文辅助文本（可选，仅适用于豆包2.0模型，用于情感和语气调整）
-# 注意：只有第一个值有效，该字段不参与计费
-# 常见用法示例：
-#   语速调整: context_texts = ["你可以说慢一点吗？"]
-#   情绪调整: context_texts = ["你可以用特别特别痛心的语气说话吗？"]
-#   语气调整: context_texts = ["嗯，你的语气再欢乐一点"]
-#   音量调整: context_texts = ["你嗓门再小点。"]
-#   音感调整: context_texts = ["你能用骄傲的语气来说话吗？"]
-#context_texts = [""]
+# 上下文辅助文本（可选，仅豆包2.0模型）
+# context_texts = []
+
+
+# CosyVoice后端配置
+[cosyvoice]
+
+# Gradio API地址
+gradio_url = "https://funaudiollm-fun-cosyvoice3-0-5b.ms.show/"
+
+# 推理模式（3s极速复刻/自然语言控制）
+default_mode = "3s极速复刻"
+
+# 默认指令（只有自然语言控制模式才会生效，3s极速复刻模式下instruct不生效）
+default_instruct = "You are a helpful assistant. 请用山东话表达。<|endofprompt|>"
+
+# 参考音频路径
+reference_audio = "/home/ubuntu/maimai/MaiBot/plugins/tts_voice_plugin/test.wav"
+
+# 提示文本
+prompt_text = "不过我当下就去解决了，还行。因为我如果看到有灰尘的话，我不去清理，这样他待在那里的话，我就会特别难受。"
+
+# API请求超时（秒）
+timeout = 300
+
+# 音频格式
+audio_format = "wav"

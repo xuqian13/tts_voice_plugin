@@ -4,7 +4,7 @@ GPT-SoVITS 后端实现
 """
 
 import asyncio
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, ClassVar
 from .base import TTSBackendBase, TTSResult
 from ..utils.text import TTSTextUtils
 from ..utils.file import TTSFileManager
@@ -20,6 +20,7 @@ class GPTSoVITSBackend(TTSBackendBase):
     GPT-SoVITS 后端
 
     使用本地 GPT-SoVITS 服务进行高度定制化的语音合成
+    支持动态切换 GPT 和 SoVITS 模型权重
     """
 
     backend_name = "gpt_sovits"
@@ -27,9 +28,76 @@ class GPTSoVITSBackend(TTSBackendBase):
     support_private_chat = True
     default_audio_format = "wav"
 
+    # 类变量：记录当前加载的模型路径，避免重复切换
+    _current_gpt_weights: ClassVar[Optional[str]] = None
+    _current_sovits_weights: ClassVar[Optional[str]] = None
+
     def get_default_voice(self) -> str:
         """获取默认风格"""
         return "default"
+
+    async def _switch_model(
+        self,
+        server: str,
+        gpt_weights: Optional[str],
+        sovits_weights: Optional[str],
+        timeout: int
+    ) -> Tuple[bool, str]:
+        """
+        切换 GPT-SoVITS 模型权重
+
+        Args:
+            server: 服务器地址
+            gpt_weights: GPT 模型权重路径
+            sovits_weights: SoVITS 模型权重路径
+            timeout: 超时时间
+
+        Returns:
+            (success, error_message)
+        """
+        session_manager = await TTSSessionManager.get_instance()
+
+        # 切换 GPT 权重
+        if gpt_weights and gpt_weights != GPTSoVITSBackend._current_gpt_weights:
+            gpt_url = f"{server.rstrip('/')}/set_gpt_weights?weights_path={gpt_weights}"
+            logger.info(f"{self.log_prefix} 切换GPT模型: {gpt_weights}")
+
+            try:
+                async with session_manager.get(
+                    gpt_url,
+                    backend_name="gpt_sovits",
+                    timeout=timeout
+                ) as response:
+                    if response.status == 200:
+                        GPTSoVITSBackend._current_gpt_weights = gpt_weights
+                        logger.info(f"{self.log_prefix} GPT模型切换成功")
+                    else:
+                        error_text = await response.text()
+                        return False, f"GPT模型切换失败: {error_text}"
+            except Exception as e:
+                return False, f"GPT模型切换异常: {e}"
+
+        # 切换 SoVITS 权重
+        if sovits_weights and sovits_weights != GPTSoVITSBackend._current_sovits_weights:
+            sovits_url = f"{server.rstrip('/')}/set_sovits_weights?weights_path={sovits_weights}"
+            logger.info(f"{self.log_prefix} 切换SoVITS模型: {sovits_weights}")
+
+            try:
+                async with session_manager.get(
+                    sovits_url,
+                    backend_name="gpt_sovits",
+                    timeout=timeout
+                ) as response:
+                    if response.status == 200:
+                        GPTSoVITSBackend._current_sovits_weights = sovits_weights
+                        logger.info(f"{self.log_prefix} SoVITS模型切换成功")
+                    else:
+                        error_text = await response.text()
+                        return False, f"SoVITS模型切换失败: {error_text}"
+            except Exception as e:
+                return False, f"SoVITS模型切换异常: {e}"
+
+        return True, ""
 
     def validate_config(self) -> Tuple[bool, str]:
         """验证配置"""
@@ -82,6 +150,8 @@ class GPTSoVITSBackend(TTSBackendBase):
         refer_wav_path = style_config.get("refer_wav", "")
         prompt_text = style_config.get("prompt_text", "")
         prompt_language = style_config.get("prompt_language", "zh")
+        gpt_weights = style_config.get("gpt_weights")
+        sovits_weights = style_config.get("sovits_weights")
 
         if not refer_wav_path or not prompt_text:
             return TTSResult(
@@ -89,6 +159,14 @@ class GPTSoVITSBackend(TTSBackendBase):
                 f"GPT-SoVITS风格 '{voice_style}' 配置不完整",
                 backend_name=self.backend_name
             )
+
+        # 如果配置了模型权重，先切换模型
+        if gpt_weights or sovits_weights:
+            switch_success, switch_error = await self._switch_model(
+                server, gpt_weights, sovits_weights, timeout
+            )
+            if not switch_success:
+                return TTSResult(False, switch_error, backend_name=self.backend_name)
 
         # 检测文本语言
         text_language = TTSTextUtils.detect_language(text)
@@ -108,7 +186,7 @@ class GPTSoVITSBackend(TTSBackendBase):
 
         try:
             session_manager = await TTSSessionManager.get_instance()
-            async with await session_manager.post(
+            async with session_manager.post(
                 tts_url,
                 json=data,
                 backend_name="gpt_sovits",

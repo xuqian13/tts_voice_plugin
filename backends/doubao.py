@@ -176,7 +176,7 @@ class DoubaoBackend(TTSBackendBase):
 
         try:
             session_manager = await TTSSessionManager.get_instance()
-            async with await session_manager.post(
+            async with session_manager.post(
                 api_url,
                 json=request_data,
                 headers=headers,

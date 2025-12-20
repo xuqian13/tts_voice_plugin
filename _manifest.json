@@ -1,8 +1,8 @@
 {
   "manifest_version": 1,
   "name": "统一TTS语音合成插件",
-  "version": "3.1.0",
-  "description": "统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS、豆包语音四种后端引擎，提供灵活的语音合成能力。",
+  "version": "3.2.0",
+  "description": "统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS、豆包语音、CosyVoice五种后端引擎，提供灵活的语音合成能力。",
   "author": {
     "name": "靓仔",
     "url": "https://github.com/xuqian13"
@@ -18,12 +18,15 @@
     "GSV2P",
     "GPT-SoVITS",
     "豆包",
+    "CosyVoice",
     "火山引擎",
     "多后端",
     "语音",
     "朗读",
     "音色",
     "语音播报",
+    "方言",
+    "声音克隆",
     "MaiCore"
   ],
   "categories": [
@@ -36,8 +39,7 @@
     "Accessibility"
   ],
   "host_application": {
-    "min_version": "0.11.0",
-    "max_version": "1.0.0"
+    "min_version": "0.11.0"
   },
   "default_locale": "zh-CN",
   "plugin_info": {
@@ -56,11 +58,12 @@
       }
     ],
     "features": [
-      "支持四种TTS后端：AI Voice、GSV2P、GPT-SoVITS、豆包语音",
+      "支持五种TTS后端：AI Voice、GSV2P、GPT-SoVITS、豆包语音、CosyVoice",
       "AI Voice: MaiCore内置，简单快速，22+预设音色",
       "GSV2P: 云端API，高质量合成，丰富的调节参数",
       "GPT-SoVITS: 本地服务，高度定制化，多风格支持",
       "豆包语音: 字节跳动云服务，支持复刻音色和情感控制",
+      "CosyVoice: 阿里云语音合成，支持17种方言、3秒声音克隆、情感控制",
       "模块化架构，后端独立实现，易于扩展",
       "HTTP Session复用，提升性能",
       "临时文件自动清理，避免并发冲突",
@@ -72,7 +75,7 @@
       "灵活的配置系统，支持各后端独立配置"
     ],
     "dependencies": {
-      "python": ["aiohttp"],
+      "python": ["aiohttp", "gradio_client"],
       "system": [],
       "plugins": []
     },
@@ -104,6 +107,13 @@
         "authentication": "需要app_id、access_key、resource_id",
         "limitations": "需要火山引擎账号",
         "features": "快速高质量、支持复刻音色、情感语气控制"
+      },
+      "cosyvoice": {
+        "provider": "阿里云 CosyVoice",
+        "endpoint": "ModelScope Gradio API",
+        "authentication": "无需认证（公开Gradio接口）",
+        "limitations": "依赖ModelScope服务可用性",
+        "features": "3秒声音克隆、17种方言支持、情感语速控制、自然语言指令"
       }
     }
   },
@@ -143,6 +153,10 @@
       {
         "name": "doubao",
         "description": "豆包语音后端配置（火山引擎认证、音色、情感等）"
+      },
+      {
+        "name": "cosyvoice",
+        "description": "CosyVoice后端配置（Gradio URL、模式、方言等）"
       }
     ]
   },
@@ -179,6 +193,12 @@
     },
     {
       "type": "command",
+      "backend": "cosyvoice",
+      "description": "手动命令使用CosyVoice",
+      "example": "/cosyvoice 你好世界 四川话"
+    },
+    {
+      "type": "command",
       "backend": "auto",
       "description": "使用默认后端",
       "example": "/tts 你好世界"
@@ -193,6 +213,7 @@
     ],
     "migration_notes": [
       "本插件整合了ai_voice_plugin、gsv2p_tts_plugin和旧版tts_voice_plugin的所有功能",
+      "v3.2.0新增CosyVoice后端支持（阿里云语音合成，支持17种方言和3秒声音克隆）",
       "v3.1.0新增豆包语音后端支持",
       "v3.1.0重构为模块化架构，提升代码可维护性",
       "配置文件需要重新生成，原配置需手动迁移",

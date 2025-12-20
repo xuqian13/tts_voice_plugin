@@ -6,6 +6,7 @@ HTTP Session 管理器
 import asyncio
 import aiohttp
 from typing import Optional, Dict, Any
+from contextlib import asynccontextmanager
 from src.common.logger import get_logger
 
 logger = get_logger("tts_session_manager")
@@ -58,6 +59,7 @@ class TTSSessionManager:
                 limit=10,  # 每个主机最大连接数
                 limit_per_host=5,
                 ttl_dns_cache=300,  # DNS缓存5分钟
+                force_close=True,  # 禁用连接复用，修复GSV2P等API的兼容性问题
             )
             self._sessions[backend_name] = aiohttp.ClientSession(
                 connector=connector,
@@ -86,6 +88,7 @@ class TTSSessionManager:
                     logger.debug(f"关闭HTTP Session: {name}")
             self._sessions.clear()
 
+    @asynccontextmanager
     async def post(
         self,
         url: str,
@@ -94,9 +97,9 @@ class TTSSessionManager:
         data: Any = None,
         backend_name: str = "default",
         timeout: int = None
-    ) -> aiohttp.ClientResponse:
+    ):
         """
-        发送POST请求
+        发送POST请求（异步上下文管理器）
 
         Args:
             url: 请求URL
@@ -106,8 +109,12 @@ class TTSSessionManager:
             backend_name: 后端名称
             timeout: 超时时间
 
-        Returns:
+        Yields:
             aiohttp.ClientResponse
+
+        Usage:
+            async with session_manager.post(url, json=data) as response:
+                ...
         """
         session = await self.get_session(backend_name, timeout)
 
@@ -116,13 +123,61 @@ class TTSSessionManager:
         if timeout:
             req_timeout = aiohttp.ClientTimeout(total=timeout)
 
-        return await session.post(
+        response = await session.post(
             url,
             json=json,
             headers=headers,
             data=data,
             timeout=req_timeout
         )
+        try:
+            yield response
+        finally:
+            response.release()
+
+    @asynccontextmanager
+    async def get(
+        self,
+        url: str,
+        headers: Dict[str, str] = None,
+        params: Dict[str, Any] = None,
+        backend_name: str = "default",
+        timeout: int = None
+    ):
+        """
+        发送GET请求（异步上下文管理器）
+
+        Args:
+            url: 请求URL
+            headers: 请求头
+            params: URL参数
+            backend_name: 后端名称
+            timeout: 超时时间
+
+        Yields:
+            aiohttp.ClientResponse
+
+        Usage:
+            async with session_manager.get(url) as response:
+                ...
+        """
+        session = await self.get_session(backend_name, timeout)
+
+        # 如果指定了不同的超时时间，创建新的超时对象
+        req_timeout = None
+        if timeout:
+            req_timeout = aiohttp.ClientTimeout(total=timeout)
+
+        response = await session.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=req_timeout
+        )
+        try:
+            yield response
+        finally:
+            response.release()
 
     async def __aenter__(self):
         return self
