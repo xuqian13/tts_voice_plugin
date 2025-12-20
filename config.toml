@@ -39,6 +39,9 @@ split_sentences = true
 # 分段发送间隔时间（秒）
 split_delay = 0.3
 
+# 是否发送错误提示消息（关闭后语音合成失败时不会发送错误信息给用户）
+send_error_messages = false
+
 
 # 组件启用控制
 [components]

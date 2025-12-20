@@ -120,6 +120,16 @@ class TTSExecutorMixin:
             return "gsv2p"
         return backend
 
+    async def _send_error(self, message: str) -> None:
+        """
+        发送错误提示信息（受全局配置控制）
+
+        Args:
+            message: 错误消息
+        """
+        if self.get_config(ConfigKeys.GENERAL_SEND_ERROR_MESSAGES, True):
+            await self.send_text(message)
+
 
 class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
     """统一TTS Action - LLM自动触发"""
@@ -236,7 +246,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             # 获取最终文本
             success, final_text = await self._get_final_text(raw_text, reason, use_replyer)
             if not success or not final_text:
-                await self.send_text("无法生成语音内容")
+                await self._send_error("无法生成语音内容")
                 return False, "文本为空"
 
             # 概率检查
@@ -255,7 +265,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             # 注意：长度应该由LLM在生成时就遵守，这里只做字符清理
             clean_text = TTSTextUtils.clean_text(final_text, self.max_text_length)
             if not clean_text:
-                await self.send_text("文本处理后为空")
+                await self._send_error("文本处理后为空")
                 return False, "文本处理后为空"
 
             # 如果清理后的文本仍然超过限制，说明LLM未遵守约束
@@ -317,7 +327,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
                         )
                         return True, f"成功发送 {success_count}/{len(sentences)} 条语音"
                     else:
-                        await self.send_text("语音合成失败")
+                        await self._send_error("语音合成失败")
                         return False, "所有语音发送失败"
                 else:
                     # 只有一句，正常发送
@@ -333,14 +343,14 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
                     action_done=True
                 )
             else:
-                await self.send_text(f"语音合成失败: {result.message}")
+                await self._send_error(f"语音合成失败: {result.message}")
 
             return result.success, result.message
 
         except Exception as e:
             error_msg = str(e)
             logger.error(f"{self.log_prefix} TTS语音合成出错: {error_msg}")
-            await self.send_text(f"语音合成出错: {error_msg}")
+            await self._send_error(f"语音合成出错: {error_msg}")
             return False, error_msg
 
 
@@ -446,7 +456,7 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
                 return True, "显示帮助信息", True
 
             if not text:
-                await self.send_text("请输入要转换为语音的文本内容")
+                await self._send_error("请输入要转换为语音的文本内容")
                 return False, "缺少文本内容", True
 
             # 确定后端
@@ -457,7 +467,7 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
             clean_text = TTSTextUtils.clean_text(text, max_length)
 
             if not clean_text:
-                await self.send_text("文本处理后为空")
+                await self._send_error("文本处理后为空")
                 return False, "文本处理后为空", True
 
             # 检查长度限制
@@ -479,13 +489,13 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
                 result = await self._execute_backend(backend, clean_text, voice)
 
             if not result.success:
-                await self.send_text(f"语音合成失败: {result.message}")
+                await self._send_error(f"语音合成失败: {result.message}")
 
             return result.success, result.message, True
 
         except Exception as e:
             logger.error(f"{self.log_prefix} TTS命令执行出错: {e}")
-            await self.send_text(f"语音合成出错: {e}")
+            await self._send_error(f"语音合成出错: {e}")
             return False, f"执行出错: {e}", True
 
 
@@ -548,6 +558,10 @@ class UnifiedTTSPlugin(BasePlugin):
             "split_delay": ConfigField(
                 type=float, default=0.3,
                 description="分段发送时每条语音之间的延迟（秒）"
+            ),
+            "send_error_messages": ConfigField(
+                type=bool, default=True,
+                description="是否发送错误提示消息（关闭后语音合成失败时不会发送错误信息给用户）"
             )
         },
         "components": {

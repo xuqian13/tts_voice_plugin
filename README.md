@@ -29,6 +29,7 @@ audio_output_dir = ""          # 音频输出目录，留空使用项目根目�
 use_base64_audio = false       # 是否使用base64发送（备选方案）
 split_sentences = true         # 是否分段发送语音（长文本逐句发送）
 split_delay = 0.3              # 分段发送间隔时间（秒）
+send_error_messages = true     # 是否发送错误提示消息（false=静默失败）
 ```
 
 ### Docker环境配置说明
@@ -197,7 +198,14 @@ A: 登录火山引擎控制台，开通语音合成服务获取。
 **Q: 文本太长被截断？**
 A: 修改 `config.toml` 中 `max_text_length = 1000`
 
+**Q: 语音合成失败时不想让Bot发送错误消息？**
+A: 设置 `send_error_messages = false`，语音合成失败时将静默处理，不向用户发送错误提示。
+
 ## 更新日志
+
+### v3.2.1
+- 新增 `send_error_messages` 配置项（可选择关闭错误提示消息）
+- 统一错误消息处理逻辑（通过 `_send_error` 方法）
 
 ### v3.2.0
 - 新增 CosyVoice 后端（阿里云 ModelScope，支持 17 种方言、3 秒声音克隆）
@@ -214,6 +222,6 @@ A: 修改 `config.toml` 中 `max_text_length = 1000`
 
 ## 信息
 
-- 版本：3.2.0
+- 版本：3.2.1
 - 作者：靓仔
 - 许可：AGPL-v3.0

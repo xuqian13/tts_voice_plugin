@@ -20,6 +20,7 @@ class ConfigKeys:
     GENERAL_USE_BASE64_AUDIO = "general.use_base64_audio"
     GENERAL_SPLIT_SENTENCES = "general.split_sentences"
     GENERAL_SPLIT_DELAY = "general.split_delay"
+    GENERAL_SEND_ERROR_MESSAGES = "general.send_error_messages"
 
     # ========== Components 组件配置 ==========
     COMPONENTS_ACTION_ENABLED = "components.action_enabled"
