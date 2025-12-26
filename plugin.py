@@ -49,28 +49,18 @@ class TTSExecutorMixin:
         Returns:
             后端实例
         """
-        backend = TTSBackendRegistry.create(
-            backend_name,
-            self.get_config,
-            self.log_prefix
-        )
+        backend = TTSBackendRegistry.create(backend_name, self.get_config, self.log_prefix)
 
         if backend:
             # 注入必要的回调函数
-            if hasattr(backend, 'set_send_custom'):
+            if hasattr(backend, "set_send_custom"):
                 backend.set_send_custom(self.send_custom)
-            if hasattr(backend, 'set_send_command'):
+            if hasattr(backend, "set_send_command"):
                 backend.set_send_command(self.send_command)
 
         return backend
 
-    async def _execute_backend(
-        self,
-        backend_name: str,
-        text: str,
-        voice: str = "",
-        emotion: str = ""
-    ) -> TTSResult:
+    async def _execute_backend(self, backend_name: str, text: str, voice: str = "", emotion: str = "") -> TTSResult:
         """
         执行指定后端
 
@@ -86,10 +76,7 @@ class TTSExecutorMixin:
         backend = self._create_backend(backend_name)
 
         if not backend:
-            return TTSResult(
-                success=False,
-                message=f"未知的TTS后端: {backend_name}"
-            )
+            return TTSResult(success=False, message=f"未知的TTS后端: {backend_name}")
 
         # AI Voice 私聊限制检查
         if backend_name == "ai_voice":
@@ -103,13 +90,13 @@ class TTSExecutorMixin:
     def _check_is_private_chat(self) -> bool:
         """检查是否是私聊"""
         # Action 中使用 chat_stream
-        if hasattr(self, 'chat_stream'):
-            return not getattr(self.chat_stream, 'group_info', None)
+        if hasattr(self, "chat_stream"):
+            return not getattr(self.chat_stream, "group_info", None)
         # Command 中使用 message
-        if hasattr(self, 'message'):
-            msg_info = getattr(self.message, 'message_info', None)
+        if hasattr(self, "message"):
+            msg_info = getattr(self.message, "message_info", None)
             if msg_info:
-                return not getattr(msg_info, 'group_info', None)
+                return not getattr(msg_info, "group_info", None)
         return False
 
     def _get_default_backend(self) -> str:
@@ -141,8 +128,17 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
     parallel_action = False
 
     activation_keywords = [
-        "语音", "说话", "朗读", "念一下", "读出来",
-        "voice", "speak", "tts", "语音回复", "用语音说", "播报"
+        "语音",
+        "说话",
+        "朗读",
+        "念一下",
+        "读出来",
+        "voice",
+        "speak",
+        "tts",
+        "语音回复",
+        "用语音说",
+        "播报",
     ]
     keyword_case_sensitive = False
 
@@ -150,7 +146,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
         "text": "要转换为语音的文本内容（必填）",
         "backend": "TTS后端引擎 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice，可选，建议省略让系统自动使用配置的默认后端)",
         "voice": "音色/风格参数（可选）",
-        "emotion": "情感/语气参数（可选，仅豆包后端有效）。支持：开心/兴奋/温柔/骄傲/生气/愤怒/伤心/失望/委屈/平静/严肃/疑惑/慢速/快速/小声/大声等"
+        "emotion": "情感/语气参数（可选，仅豆包后端有效）。支持：开心/兴奋/温柔/骄傲/生气/愤怒/伤心/失望/委屈/平静/严肃/疑惑/慢速/快速/小声/大声等",
     }
 
     action_require = [
@@ -158,7 +154,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
         "当回复简短问候语时使用（如早上好、晚安、你好等）",
         "当想让回复更活泼生动时可以使用",
         "注意：回复内容过长或者过短不适合用语音",
-        "注意：backend参数建议省略，系统会自动使用配置的默认后端"
+        "注意：backend参数建议省略，系统会自动使用配置的默认后端",
     ]
 
     associated_types = ["text", "command"]
@@ -173,8 +169,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
         if not self.get_config(ConfigKeys.PROBABILITY_KEYWORD_FORCE_TRIGGER, True):
             return False
         force_keywords = self.get_config(
-            ConfigKeys.PROBABILITY_FORCE_KEYWORDS,
-            ["一定要用语音", "必须语音", "语音回复我", "务必用语音"]
+            ConfigKeys.PROBABILITY_FORCE_KEYWORDS, ["一定要用语音", "必须语音", "语音回复我", "务必用语音"]
         )
         return any(kw in text for kw in force_keywords)
 
@@ -217,7 +212,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
                 reply_reason=reason,
                 extra_info="\n".join(extra_info_parts),
                 request_type="tts_voice_plugin",
-                from_plugin=False  # 允许触发POST_LLM事件，使日程注入生效
+                from_plugin=False,  # 允许触发POST_LLM事件，使日程注入生效
             )
             if success and llm_response and llm_response.content:
                 logger.info(f"{self.log_prefix} 语音内容生成成功")
@@ -233,7 +228,48 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             logger.error(f"{self.log_prefix} 调用 replyer 出错: {e}")
             return bool(raw_text), raw_text
 
+
+
     async def execute(self) -> Tuple[bool, str]:
+        async def send_message_with_splited_sentences() -> Tuple[bool, str]:
+        # 分段发送模式：将文本分割成句子，逐句发送语音
+            if len(sentences) > 1:
+                logger.info(f"{self.log_prefix} 分段发送模式：共 {len(sentences)} 句")
+
+                success_count = 0
+                all_sentences_text = []
+
+                for i, sentence in enumerate(sentences):
+                    if not sentence.strip():
+                        continue
+
+                    logger.debug(f"{self.log_prefix} 发送第 {i + 1}/{len(sentences)} 句: {sentence[:30]}...")
+                    result = await self._execute_backend(backend, sentence, voice, emotion)
+
+                    if result.success:
+                        success_count += 1
+                        all_sentences_text.append(sentence)
+                    else:
+                        logger.warning(f"{self.log_prefix} 第 {i + 1} 句发送失败: {result.message}")
+
+                    # 句子之间添加延迟
+                    if i < len(sentences) - 1 and split_delay > 0:
+                        await asyncio.sleep(split_delay)
+
+                # 记录动作信息
+                if success_count > 0:
+                    display_text = "".join(all_sentences_text)
+                    await self.store_action_info(
+                        action_build_into_prompt=True, action_prompt_display=f"[语音：{display_text}]", action_done=True
+                    )
+                    return True, f"成功发送 {success_count}/{len(sentences)} 条语音"
+                else:
+                    await self._send_error("语音合成失败")
+                    return False, "所有语音发送失败"
+            else:
+                # 只有一句，正常发送
+                result = await self._execute_backend(backend, clean_text, voice, emotion)
+
         """执行TTS语音合成"""
         try:
             raw_text = self.action_data.get("text", "").strip()
@@ -257,7 +293,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
                 await self.store_action_info(
                     action_build_into_prompt=True,
                     action_prompt_display=f"回复了文字消息：{final_text[:50]}...",
-                    action_done=True
+                    action_done=True,
                 )
                 return True, "概率检查未通过，已发送文字回复"
 
@@ -278,7 +314,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
                 await self.store_action_info(
                     action_build_into_prompt=True,
                     action_prompt_display="回复了文字消息（内容超过语音限制）",
-                    action_done=True
+                    action_done=True,
                 )
                 return True, "内容超过语音长度限制，已改为文字回复"
 
@@ -290,57 +326,25 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             split_sentences = self.get_config(ConfigKeys.GENERAL_SPLIT_SENTENCES, True)
             split_delay = self.get_config(ConfigKeys.GENERAL_SPLIT_DELAY, 0.3)
 
+            sentences = None
+
             if split_sentences:
                 # 分段发送模式：将文本分割成句子，逐句发送语音
                 sentences = TTSTextUtils.split_sentences(clean_text)
 
-                if len(sentences) > 1:
-                    logger.info(f"{self.log_prefix} 分段发送模式：共 {len(sentences)} 句")
-
-                    success_count = 0
-                    all_sentences_text = []
-
-                    for i, sentence in enumerate(sentences):
-                        if not sentence.strip():
-                            continue
-
-                        logger.debug(f"{self.log_prefix} 发送第 {i+1}/{len(sentences)} 句: {sentence[:30]}...")
-                        result = await self._execute_backend(backend, sentence, voice, emotion)
-
-                        if result.success:
-                            success_count += 1
-                            all_sentences_text.append(sentence)
-                        else:
-                            logger.warning(f"{self.log_prefix} 第 {i+1} 句发送失败: {result.message}")
-
-                        # 句子之间添加延迟
-                        if i < len(sentences) - 1 and split_delay > 0:
-                            await asyncio.sleep(split_delay)
-
-                    # 记录动作信息
-                    if success_count > 0:
-                        display_text = "".join(all_sentences_text)
-                        await self.store_action_info(
-                            action_build_into_prompt=True,
-                            action_prompt_display=f"[语音：{display_text}]",
-                            action_done=True
-                        )
-                        return True, f"成功发送 {success_count}/{len(sentences)} 条语音"
-                    else:
-                        await self._send_error("语音合成失败")
-                        return False, "所有语音发送失败"
-                else:
-                    # 只有一句，正常发送
-                    result = await self._execute_backend(backend, clean_text, voice, emotion)
+                await send_message_with_splited_sentences()
+            elif '|||split|||' in clean_text:
+                # 适配智能分段插件
+                sentences = clean_text.split('|||split|||')
+                await send_message_with_splited_sentences()
+                
             else:
                 # 原有逻辑：整段发送
                 result = await self._execute_backend(backend, clean_text, voice, emotion)
 
             if result.success:
                 await self.store_action_info(
-                    action_build_into_prompt=True,
-                    action_prompt_display=f"[语音：{clean_text}]",
-                    action_done=True
+                    action_build_into_prompt=True, action_prompt_display=f"[语音：{clean_text}]", action_done=True
                 )
             else:
                 await self._send_error(f"语音合成失败: {result.message}")
@@ -351,7 +355,8 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             error_msg = str(e)
             logger.error(f"{self.log_prefix} TTS语音合成出错: {error_msg}")
             await self._send_error(f"语音合成出错: {error_msg}")
-            return False, error_msg
+            return False, 
+
 
 
 class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
@@ -368,7 +373,7 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
         "/cosyvoice 你好世界 -v 四川话",
         "/tts 试试 -v 温柔妹妹 ai_voice",
         "/gsv2p 你好世界",
-        "/doubao 你好世界 -v 开心"
+        "/doubao 你好世界 -v 开心",
     ]
     intercept_message = True
 
@@ -376,7 +381,8 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
         """发送帮助信息"""
         default_backend = self._get_default_backend()
 
-        help_text = """【TTS语音合成插件帮助】
+        help_text = (
+            """【TTS语音合成插件帮助】
 
 📝 基本语法：
 /tts <文本> [-v <音色>] [后端]
@@ -410,7 +416,9 @@ class UnifiedTTSCommand(BaseCommand, TTSExecutorMixin):
 /cosyvoice 你好 -v 广东话
 /voice 测试一下 -v 温柔妹妹
 
-⚙️ 当前默认后端：""" + default_backend
+⚙️ 当前默认后端："""
+            + default_backend
+        )
 
         await self.send_text(help_text)
 
@@ -521,52 +529,44 @@ class UnifiedTTSPlugin(BasePlugin):
         "gsv2p": "GSV2P后端配置",
         "gpt_sovits": "GPT-SoVITS后端配置",
         "doubao": "豆包语音后端配置",
-        "cosyvoice": "CosyVoice后端配置"
+        "cosyvoice": "CosyVoice后端配置",
     }
 
     config_schema = {
         "plugin": {
             "enabled": ConfigField(type=bool, default=True, description="是否启用插件"),
-            "config_version": ConfigField(type=str, default="3.2.0", description="配置文件版本")
+            "config_version": ConfigField(type=str, default="3.2.0", description="配置文件版本"),
         },
         "general": {
             "default_backend": ConfigField(
-                type=str, default="doubao",
-                description="默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice)"
+                type=str, default="doubao", description="默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice)"
             ),
             "timeout": ConfigField(type=int, default=60, description="请求超时时间（秒）"),
             "max_text_length": ConfigField(
-                type=int, default=200,
-                description="最大文本长度（该限制会在调用LLM时注入到prompt中，让LLM直接生成符合长度的回复，而不是被动截断）"
+                type=int,
+                default=200,
+                description="最大文本长度（该限制会在调用LLM时注入到prompt中，让LLM直接生成符合长度的回复，而不是被动截断）",
             ),
-            "use_replyer_rewrite": ConfigField(
-                type=bool, default=True,
-                description="是否使用replyer润色语音内容"
-            ),
+            "use_replyer_rewrite": ConfigField(type=bool, default=True, description="是否使用replyer润色语音内容"),
             "audio_output_dir": ConfigField(
-                type=str, default="",
-                description="音频文件输出目录（支持相对路径和绝对路径，留空使用项目根目录）"
+                type=str, default="", description="音频文件输出目录（支持相对路径和绝对路径，留空使用项目根目录）"
             ),
             "use_base64_audio": ConfigField(
-                type=bool, default=True,
-                description="是否使用base64编码发送音频（备选方案）"
+                type=bool, default=True, description="是否使用base64编码发送音频（备选方案）"
             ),
             "split_sentences": ConfigField(
-                type=bool, default=True,
-                description="是否分段发送语音（每句话单独发送一条语音，避免长语音播放问题）"
+                type=bool, default=True, description="是否分段发送语音（每句话单独发送一条语音，避免长语音播放问题）"
             ),
-            "split_delay": ConfigField(
-                type=float, default=0.3,
-                description="分段发送时每条语音之间的延迟（秒）"
-            ),
+            "split_delay": ConfigField(type=float, default=0.3, description="分段发送时每条语音之间的延迟（秒）"),
             "send_error_messages": ConfigField(
-                type=bool, default=True,
-                description="是否发送错误提示消息（关闭后语音合成失败时不会发送错误信息给用户）"
-            )
+                type=bool,
+                default=True,
+                description="是否发送错误提示消息（关闭后语音合成失败时不会发送错误信息给用户）",
+            ),
         },
         "components": {
             "action_enabled": ConfigField(type=bool, default=True, description="是否启用Action组件"),
-            "command_enabled": ConfigField(type=bool, default=True, description="是否启用Command组件")
+            "command_enabled": ConfigField(type=bool, default=True, description="是否启用Command组件"),
         },
         "probability": {
             "enabled": ConfigField(type=bool, default=True, description="是否启用概率控制"),
@@ -575,30 +575,26 @@ class UnifiedTTSPlugin(BasePlugin):
             "force_keywords": ConfigField(
                 type=list,
                 default=["一定要用语音", "必须语音", "语音回复我", "务必用语音"],
-                description="强制触发关键词"
-            )
+                description="强制触发关键词",
+            ),
         },
         "ai_voice": {
             "default_character": ConfigField(type=str, default="邻家小妹", description="默认AI语音音色"),
-            "alias_map": ConfigField(type=dict, default=AI_VOICE_ALIAS_MAP, description="音色别名映射")
+            "alias_map": ConfigField(type=dict, default=AI_VOICE_ALIAS_MAP, description="音色别名映射"),
         },
         "gsv2p": {
             "api_url": ConfigField(
-                type=str, default="https://gsv2p.acgnai.top/v1/audio/speech",
-                description="GSV2P API地址"
+                type=str, default="https://gsv2p.acgnai.top/v1/audio/speech", description="GSV2P API地址"
             ),
             "api_token": ConfigField(type=str, default="", description="API认证Token"),
             "default_voice": ConfigField(type=str, default="原神-中文-派蒙_ZH", description="默认音色"),
             "timeout": ConfigField(type=int, default=60, description="API请求超时（秒）"),
             "model": ConfigField(type=str, default="tts-v4", description="TTS模型"),
             "response_format": ConfigField(type=str, default="mp3", description="音频格式"),
-            "speed": ConfigField(type=float, default=1.0, description="语音速度")
+            "speed": ConfigField(type=float, default=1.0, description="语音速度"),
         },
         "gpt_sovits": {
-            "server": ConfigField(
-                type=str, default="http://127.0.0.1:9880",
-                description="GPT-SoVITS服务地址"
-            ),
+            "server": ConfigField(type=str, default="http://127.0.0.1:9880", description="GPT-SoVITS服务地址"),
             "styles": ConfigField(
                 type=dict,
                 default={
@@ -607,65 +603,47 @@ class UnifiedTTSPlugin(BasePlugin):
                         "prompt_text": "",
                         "prompt_language": "zh",
                         "gpt_weights": "",
-                        "sovits_weights": ""
+                        "sovits_weights": "",
                     }
                 },
-                description="语音风格配置"
-            )
+                description="语音风格配置",
+            ),
         },
         "doubao": {
             "api_url": ConfigField(
                 type=str,
                 default="https://openspeech.bytedance.com/api/v3/tts/unidirectional",
-                description="豆包语音API地址"
+                description="豆包语音API地址",
             ),
             "app_id": ConfigField(type=str, default="", description="豆包APP ID"),
             "access_key": ConfigField(type=str, default="", description="豆包Access Key"),
             "resource_id": ConfigField(type=str, default="seed-tts-2.0", description="豆包Resource ID"),
-            "default_voice": ConfigField(
-                type=str, default="zh_female_vv_uranus_bigtts",
-                description="默认音色"
-            ),
+            "default_voice": ConfigField(type=str, default="zh_female_vv_uranus_bigtts", description="默认音色"),
             "timeout": ConfigField(type=int, default=60, description="API请求超时（秒）"),
             "audio_format": ConfigField(type=str, default="mp3", description="音频格式"),
             "sample_rate": ConfigField(type=int, default=24000, description="采样率"),
             "bitrate": ConfigField(type=int, default=128000, description="比特率"),
             "speed": ConfigField(type=float, default=None, description="语音速度（可选）"),
             "volume": ConfigField(type=float, default=None, description="音量（可选）"),
-            "context_texts": ConfigField(
-                type=list, default=None,
-                description="上下文辅助文本（可选，仅豆包2.0模型）"
-            )
+            "context_texts": ConfigField(type=list, default=None, description="上下文辅助文本（可选，仅豆包2.0模型）"),
         },
         "cosyvoice": {
             "gradio_url": ConfigField(
-                type=str,
-                default="https://funaudiollm-fun-cosyvoice3-0-5b.ms.show/",
-                description="Gradio API地址"
+                type=str, default="https://funaudiollm-fun-cosyvoice3-0-5b.ms.show/", description="Gradio API地址"
             ),
             "default_mode": ConfigField(
-                type=str,
-                default="自然语言控制",
-                description="推理模式（3s极速复刻/自然语言控制）"
+                type=str, default="自然语言控制", description="推理模式（3s极速复刻/自然语言控制）"
             ),
             "default_instruct": ConfigField(
                 type=str,
                 default="You are a helpful assistant. 请用广东话表达。<|endofprompt|>",
-                description="默认指令（用于自然语言控制模式）"
+                description="默认指令（用于自然语言控制模式）",
             ),
-            "reference_audio": ConfigField(
-                type=str,
-                default="",
-                description="参考音频路径（用于3s极速复刻模式）"
-            ),
-            "prompt_text": ConfigField(
-                type=str,
-                default="",
-                description="提示文本（用于3s极速复刻模式）"
-            ),
+            "reference_audio": ConfigField(type=str, default="", description="参考音频路径（用于3s极速复刻模式）"),
+            "prompt_text": ConfigField(type=str, default="", description="提示文本（用于3s极速复刻模式）"),
             "timeout": ConfigField(type=int, default=120, description="API请求超时（秒）"),
-            "audio_format": ConfigField(type=str, default="wav", description="音频格式")
-        }
+            "audio_format": ConfigField(type=str, default="wav", description="音频格式"),
+        },
     }
 
     def get_plugin_components(self) -> List[Tuple[ComponentInfo, Type]]:
