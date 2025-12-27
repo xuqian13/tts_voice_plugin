@@ -2,6 +2,9 @@
 TTS后端模块
 """
 
+import sys
+sys.dont_write_bytecode = True
+
 from .base import TTSBackendBase, TTSBackendRegistry, TTSResult
 from .ai_voice import AIVoiceBackend
 from .gsv2p import GSV2PBackend

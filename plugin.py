@@ -2,9 +2,12 @@
 统一TTS语音合成插件
 支持五种后端：AI Voice (MaiCore内置) / GSV2P (云API) / GPT-SoVITS (本地服务) / 豆包语音 (云API) / CosyVoice (ModelScope Gradio)
 
-Version: 3.2.0
+Version: 3.2.2
 Author: 靓仔
 """
+
+import sys
+sys.dont_write_bytecode = True
 
 import asyncio
 import random
@@ -343,17 +346,17 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
 
             sentences = None
 
-            if split_sentences:
-                # 分段发送模式：将文本分割成句子，逐句发送语音
-                sentences = TTSTextUtils.split_sentences(clean_text)
-
-                return await send_message_with_splited_sentences()
+            # 优先使用智能分割插件的分隔符
             if '|||SPLIT|||' in clean_text:
-                logger.info("found split")
+                logger.info("found split marker from smart segmentation plugin")
                 sentences = [s.strip() for s in clean_text.split("|||SPLIT|||") if s.strip()]
                 return await send_message_with_splited_sentences()
-                
+            elif split_sentences:
+                # 其次使用自动句子分割
+                sentences = TTSTextUtils.split_sentences(clean_text)
+                return await send_message_with_splited_sentences()
             else:
+                # 单句发送
                 return await send_message_single_sentences()
 
         except Exception as e:
@@ -588,8 +591,11 @@ class UnifiedTTSPlugin(BasePlugin):
             )
         },
         "ai_voice": {
-            "default_character": ConfigField(type=str, default="邻家小妹", description="默认AI语音音色"),
-            "alias_map": ConfigField(type=dict, default=AI_VOICE_ALIAS_MAP, description="音色别名映射")
+            "default_character": ConfigField(
+                type=str,
+                default="邻家小妹",
+                description="默认音色（可选：小新、猴哥、四郎、东北老妹儿、广西大表哥、妲己、霸道总裁、酥心御姐、说书先生、憨憨小弟、憨厚老哥、吕布、元气少女、文艺少女、磁性大叔、邻家小妹、低沉男声、傲娇少女、爹系男友、暖心姐姐、温柔妹妹、书香少女）"
+            )
         },
         "gsv2p": {
             "api_url": ConfigField(
@@ -609,17 +615,27 @@ class UnifiedTTSPlugin(BasePlugin):
                 description="GPT-SoVITS服务地址"
             ),
             "styles": ConfigField(
-                type=dict,
-                default={
-                    "default": {
+                type=list,
+                default=[
+                    {
+                        "name": "default",
                         "refer_wav": "",
                         "prompt_text": "",
                         "prompt_language": "zh",
                         "gpt_weights": "",
                         "sovits_weights": ""
                     }
-                },
-                description="语音风格配置"
+                ],
+                description="语音风格配置",
+                item_type="object",
+                item_fields={
+                    "name": {"type": "string", "label": "风格名称", "required": True},
+                    "refer_wav": {"type": "string", "label": "参考音频路径", "required": True},
+                    "prompt_text": {"type": "string", "label": "参考文本", "required": True},
+                    "prompt_language": {"type": "string", "label": "参考语言", "default": "zh"},
+                    "gpt_weights": {"type": "string", "label": "GPT模型权重路径（可选）", "required": False},
+                    "sovits_weights": {"type": "string", "label": "SoVITS模型权重路径（可选）", "required": False}
+                }
             )
         },
         "doubao": {

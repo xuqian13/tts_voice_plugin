@@ -210,7 +210,7 @@ class DoubaoBackend(TTSBackendBase):
                         audio_data=audio_data,
                         audio_format=audio_format,
                         prefix="tts_doubao",
-                        voice_info=f"��色: {voice}"
+                        voice_info=f"音色: {voice}"
                     )
                 else:
                     error_text = await response.text()

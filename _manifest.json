@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "name": "统一TTS语音合成插件",
-  "version": "3.2.0",
+  "version": "3.2.2",
   "description": "统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS、豆包语音、CosyVoice五种后端引擎，提供灵活的语音合成能力。",
   "author": {
     "name": "靓仔",
@@ -75,7 +75,10 @@
       "灵活的配置系统，支持各后端独立配置"
     ],
     "dependencies": {
-      "python": ["aiohttp", "gradio_client"],
+      "python": [
+        "aiohttp",
+        "gradio_client"
+      ],
       "system": [],
       "plugins": []
     },
@@ -213,6 +216,10 @@
     ],
     "migration_notes": [
       "本插件整合了ai_voice_plugin、gsv2p_tts_plugin和旧版tts_voice_plugin的所有功能",
+      "v3.2.2适配智能分割插件（支持|||SPLIT|||分隔符精确分段）",
+      "v3.2.2支持GPT-SoVITS数组格式配置（WebUI友好，向后兼容字典格式）",
+      "v3.2.2修复豆包语音音色信息显示乱码问题",
+      "v3.2.2优化配置文件注释，更简洁清晰",
       "v3.2.0新增CosyVoice后端支持（阿里云语音合成，支持17种方言和3秒声音克隆）",
       "v3.1.0新增豆包语音后端支持",
       "v3.1.0重构为模块化架构，提升代码可维护性",
@@ -223,5 +230,6 @@
       "GPT-SoVITS风格配置需要重新设置",
       "新增config.toml.example模板文件"
     ]
-  }
+  },
+  "id": "靓仔.tts_voice_plugin"
 }

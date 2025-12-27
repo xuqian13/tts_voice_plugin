@@ -108,6 +108,31 @@ default_character = "温柔妹妹"
 
 ### GPT-SoVITS 配置
 
+**支持两种配置格式：**
+
+#### 格式1：数组格式（推荐，WebUI 友好）
+
+```toml
+[gpt_sovits]
+server = "http://127.0.0.1:9880"
+
+[[gpt_sovits.styles]]
+name = "default"
+refer_wav = "/path/to/reference.wav"
+prompt_text = "参考文本"
+prompt_language = "zh"
+gpt_weights = "/path/to/model.ckpt"      # 可选：动态模型切换
+sovits_weights = "/path/to/model.pth"    # 可选：动态模型切换
+
+[[gpt_sovits.styles]]
+name = "happy"
+refer_wav = "/path/to/happy.wav"
+prompt_text = "开心的参考文本"
+prompt_language = "zh"
+```
+
+#### 格式2：字典格式（兼容旧版）
+
 ```toml
 [gpt_sovits]
 server = "http://127.0.0.1:9880"
@@ -116,10 +141,11 @@ server = "http://127.0.0.1:9880"
 refer_wav = "/path/to/reference.wav"
 prompt_text = "参考文本"
 prompt_language = "zh"
-# 可选：动态模型切换（使用该风格时自动切换模型）
 gpt_weights = "/path/to/model.ckpt"
 sovits_weights = "/path/to/model.pth"
 ```
+
+> **提示：** 插件会自动识别并兼容两种格式，推荐使用数组格式以获得更好的 WebUI 支持。
 
 ### CosyVoice 配置
 
@@ -169,6 +195,14 @@ enabled = true
 base_probability = 0.3  # 30% 概率
 ```
 
+### 智能分割插件支持
+
+本插件已适配智能分割插件，支持使用 `|||SPLIT|||` 分隔符进行精确分段：
+
+- **优先级**：智能分割标记 > 自动句子分割 > 单句发送
+- **使用方式**：智能分割插件会在适当位置插入 `|||SPLIT|||` 标记，本插件自动识别并按标记分段发送
+- **示例**：`今天天气不错|||SPLIT|||适合出去玩|||SPLIT|||你觉得呢` 会分成三段语音依次发送
+
 ## 项目结构
 
 ```
@@ -203,6 +237,15 @@ A: 设置 `send_error_messages = false`，语音合成失败时将静默处理�
 
 ## 更新日志
 
+### v3.2.2
+- 适配智能分割插件（支持 `|||SPLIT|||` 分隔符精确分段）
+- GPT-SoVITS 支持数组格式配置（WebUI 友好，向后兼容字典格式）
+- 修复豆包语音音色信息显示乱码问题
+- 优化配置文件注释，更简洁清晰
+- 优化分段发送逻辑优先级（智能分割 > 自动分割 > 单句）
+- 禁用 Python 字节码生成（保持目录干净）
+- 添加插件 ID 标识字段
+
 ### v3.2.1
 - 新增 `send_error_messages` 配置项（可选择关闭错误提示消息）
 - 统一错误消息处理逻辑（通过 `_send_error` 方法）
@@ -222,6 +265,6 @@ A: 设置 `send_error_messages = false`，语音合成失败时将静默处理�
 
 ## 信息
 
-- 版本：3.2.1
+- 版本：3.2.2
 - 作者：靓仔
 - 许可：AGPL-v3.0

@@ -99,9 +99,39 @@ class GPTSoVITSBackend(TTSBackendBase):
 
         return True, ""
 
+    def _normalize_styles_config(self, styles_config: Any) -> Dict[str, Any]:
+        """
+        规范化风格配置格式
+
+        支持两种格式：
+        1. 旧格式（字典）: {"default": {...}, "happy": {...}}
+        2. 新格式（数组）: [{"name": "default", ...}, {"name": "happy", ...}]
+
+        统一转换为字典格式供内部使用
+        """
+        # 如果是字典格式（旧格式），直接返回
+        if isinstance(styles_config, dict):
+            return styles_config
+
+        # 如果是数组格式（新格式），转换为字典
+        if isinstance(styles_config, list):
+            result = {}
+            for style in styles_config:
+                if isinstance(style, dict) and "name" in style:
+                    style_name = style["name"]
+                    # 复制配置，移除 name 字段
+                    style_data = {k: v for k, v in style.items() if k != "name"}
+                    result[style_name] = style_data
+            return result
+
+        # 其他情况返回空字典
+        return {}
+
     def validate_config(self) -> Tuple[bool, str]:
         """验证配置"""
-        styles: Dict[str, Any] = self.get_config(ConfigKeys.GPT_SOVITS_STYLES, {})
+        styles_raw = self.get_config(ConfigKeys.GPT_SOVITS_STYLES, {})
+        styles = self._normalize_styles_config(styles_raw)
+
         if not styles or "default" not in styles:
             return False, "GPT-SoVITS未配置任何语音风格"
 
@@ -133,7 +163,8 @@ class GPTSoVITSBackend(TTSBackendBase):
 
         # 获取配置
         server = self.get_config(ConfigKeys.GPT_SOVITS_SERVER, "http://127.0.0.1:9880")
-        styles: Dict[str, Any] = self.get_config(ConfigKeys.GPT_SOVITS_STYLES, {})
+        styles_raw = self.get_config(ConfigKeys.GPT_SOVITS_STYLES, {})
+        styles = self._normalize_styles_config(styles_raw)
         timeout = self.get_config(ConfigKeys.GENERAL_TIMEOUT, 60)
 
         # 确定使用的风格
