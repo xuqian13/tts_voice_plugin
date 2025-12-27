@@ -234,45 +234,6 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             return bool(raw_text), raw_text
 
     async def execute(self) -> Tuple[bool, str]:
-        async def send_message_with_splited_sentences() -> Tuple[bool, str]:
-        # 分段发送模式：将文本分割成句子，逐句发送语音
-            if len(sentences) > 1:
-                logger.info(f"{self.log_prefix} 分段发送模式：共 {len(sentences)} 句")
-
-                success_count = 0
-                all_sentences_text = []
-
-                for i, sentence in enumerate(sentences):
-                    if not sentence.strip():
-                        continue
-
-                    logger.debug(f"{self.log_prefix} 发送第 {i + 1}/{len(sentences)} 句: {sentence[:30]}...")
-                    result = await self._execute_backend(backend, sentence, voice, emotion)
-
-                    if result.success:
-                        success_count += 1
-                        all_sentences_text.append(sentence)
-                    else:
-                        logger.warning(f"{self.log_prefix} 第 {i + 1} 句发送失败: {result.message}")
-
-                    # 句子之间添加延迟
-                    if i < len(sentences) - 1 and split_delay > 0:
-                        await asyncio.sleep(split_delay)
-
-                # 记录动作信息
-                if success_count > 0:
-                    display_text = "".join(all_sentences_text)
-                    await self.store_action_info(
-                        action_build_into_prompt=True, action_prompt_display=f"[语音：{display_text}]", action_done=True
-                    )
-                    return True, f"成功发送 {success_count}/{len(sentences)} 条语音"
-                else:
-                    await self._send_error("语音合成失败")
-                    return False, "所有语音发送失败"
-            else:
-                # 只有一句，正常发送
-                result = await self._execute_backend(backend, clean_text, voice, emotion)
-
         """执行TTS语音合成"""
         try:
             raw_text = self.action_data.get("text", "").strip()
@@ -329,17 +290,48 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             split_sentences = self.get_config(ConfigKeys.GENERAL_SPLIT_SENTENCES, True)
             split_delay = self.get_config(ConfigKeys.GENERAL_SPLIT_DELAY, 0.3)
 
-            sentences = None
-
             if split_sentences:
                 # 分段发送模式：将文本分割成句子，逐句发送语音
                 sentences = TTSTextUtils.split_sentences(clean_text)
 
-                await send_message_with_splited_sentences()
-            elif '|||SPLIT|||' in clean_text:
-                sentences = [s.strip() for s in clean_text.split("|||SPLIT|||") if s.strip()]
-                await send_message_with_splited_sentences()
-                
+                if len(sentences) > 1:
+                    logger.info(f"{self.log_prefix} 分段发送模式：共 {len(sentences)} 句")
+
+                    success_count = 0
+                    all_sentences_text = []
+
+                    for i, sentence in enumerate(sentences):
+                        if not sentence.strip():
+                            continue
+
+                        logger.debug(f"{self.log_prefix} 发送第 {i+1}/{len(sentences)} 句: {sentence[:30]}...")
+                        result = await self._execute_backend(backend, sentence, voice, emotion)
+
+                        if result.success:
+                            success_count += 1
+                            all_sentences_text.append(sentence)
+                        else:
+                            logger.warning(f"{self.log_prefix} 第 {i+1} 句发送失败: {result.message}")
+
+                        # 句子之间添加延迟
+                        if i < len(sentences) - 1 and split_delay > 0:
+                            await asyncio.sleep(split_delay)
+
+                    # 记录动作信息
+                    if success_count > 0:
+                        display_text = "".join(all_sentences_text)
+                        await self.store_action_info(
+                            action_build_into_prompt=True,
+                            action_prompt_display=f"[语音：{display_text}]",
+                            action_done=True
+                        )
+                        return True, f"成功发送 {success_count}/{len(sentences)} 条语音"
+                    else:
+                        await self._send_error("语音合成失败")
+                        return False, "所有语音发送失败"
+                else:
+                    # 只有一句，正常发送
+                    result = await self._execute_backend(backend, clean_text, voice, emotion)
             else:
                 # 原有逻辑：整段发送
                 result = await self._execute_backend(backend, clean_text, voice, emotion)
