@@ -175,6 +175,104 @@ class DoubaoStreamParser:
             )
             return None
 
+    def _find_data_chunk_offset(self, header: bytes) -> int:
+        """
+        在 WAV header 中查找 'data' 块的位置
+
+        豆包返回的 WAV 可能包含额外的元数据块（如 LIST/INFO），
+        导致 'data' 块不在标准的 44 字节位置。
+
+        Args:
+            header: WAV 文件头部数据
+
+        Returns:
+            data 块数据开始的位置（即 'data' + 4字节大小之后）
+        """
+        pos = 12  # 跳过 RIFF(4) + size(4) + WAVE(4)
+
+        while pos < len(header) - 8:
+            chunk_id = header[pos:pos+4]
+            chunk_size = int.from_bytes(header[pos+4:pos+8], 'little')
+
+            if chunk_id == b'data':
+                return pos + 8  # 返回音频数据开始位置
+
+            # 移动到下一个块
+            pos += 8 + chunk_size
+            # WAV 块需要对齐到偶数字节
+            if chunk_size % 2 == 1:
+                pos += 1
+
+        # 未找到 data 块，返回默认值
+        return 44
+
+    def _merge_audio_chunks(self, chunks: List[bytes]) -> bytes:
+        """
+        合并音频块，处理 WAV 格式的流式响应
+
+        豆包流式 WAV 响应特点：
+        1. 第一个块包含完整 header（可能 > 44 字节，含 LIST/INFO 元数据）
+        2. header 中的大小字段是 0xFFFFFFFF（流式占位符）
+        3. 后续块是纯音频数据（无 header）
+        4. 需要在合并后修正大小字段
+
+        Args:
+            chunks: 音频数据块列表
+
+        Returns:
+            合并后的有效 WAV 文件
+        """
+        if not chunks:
+            return b''
+
+        first_chunk = chunks[0]
+
+        # 检查是否是 WAV 格式（RIFF header）
+        if len(first_chunk) < 44 or first_chunk[:4] != b'RIFF':
+            # 不是 WAV 格式（如 MP3），直接拼接
+            return b''.join(chunks)
+
+        # 查找 data 块的实际位置
+        data_offset = self._find_data_chunk_offset(first_chunk)
+        logger.debug(f"{self.log_prefix} WAV data 块偏移: {data_offset} 字节")
+
+        # 提取 header 和第一块的音频数据
+        header = bytearray(first_chunk[:data_offset])
+        data_parts = [first_chunk[data_offset:]]
+        skipped_headers = 0
+
+        # 处理后续块
+        for chunk in chunks[1:]:
+            if len(chunk) > 44 and chunk[:4] == b'RIFF':
+                # 后续块也有 RIFF header，需要跳过
+                chunk_data_offset = self._find_data_chunk_offset(chunk)
+                data_parts.append(chunk[chunk_data_offset:])
+                skipped_headers += 1
+            else:
+                # 纯音频数据
+                data_parts.append(chunk)
+
+        # 合并所有音频数据
+        audio_data = b''.join(data_parts)
+        audio_size = len(audio_data)
+
+        # 修正 WAV header 中的大小字段
+        # 字节 4-7: 文件总大小 - 8 = (header_size - 8) + audio_size
+        file_size = len(header) - 8 + audio_size
+        header[4:8] = file_size.to_bytes(4, 'little')
+
+        # 修正 data 块的大小字段（位于 data_offset - 4 处）
+        header[data_offset-4:data_offset] = audio_size.to_bytes(4, 'little')
+
+        if skipped_headers > 0 or audio_size > 0:
+            logger.info(
+                f"{self.log_prefix} WAV 流式合并完成: "
+                f"header={len(header)}字节, 音频={audio_size}字节, "
+                f"跳过重复header={skipped_headers}"
+            )
+
+        return bytes(header) + audio_data
+
     def feed_chunk(self, chunk: bytes) -> Optional[str]:
         """
         输入一块数据
@@ -293,8 +391,8 @@ class DoubaoStreamParser:
             )
             return None, "音频数据不完整或已损坏"
 
-        # 合并所有有效的音频数据
-        merged_audio = b''.join(valid_chunks)
+        # 合并所有有效的音频数据（处理 WAV 多 header 问题）
+        merged_audio = self._merge_audio_chunks(valid_chunks)
 
         logger.info(
             f"{self.log_prefix} 音频合并完成 - "

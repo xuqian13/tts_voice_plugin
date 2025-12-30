@@ -1,7 +1,7 @@
 {
   "manifest_version": 1,
   "name": "统一TTS语音合成插件",
-  "version": "3.2.2",
+  "version": "3.2.3",
   "description": "统一TTS语音合成插件，整合AI Voice、GSV2P、GPT-SoVITS、豆包语音、CosyVoice五种后端引擎，提供灵活的语音合成能力。",
   "author": {
     "name": "靓仔",

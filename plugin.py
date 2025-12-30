@@ -2,7 +2,7 @@
 统一TTS语音合成插件
 支持五种后端：AI Voice (MaiCore内置) / GSV2P (云API) / GPT-SoVITS (本地服务) / 豆包语音 (云API) / CosyVoice (ModelScope Gradio)
 
-Version: 3.2.2
+Version: 3.2.3
 Author: 靓仔
 """
 
@@ -202,17 +202,17 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             return True, raw_text
 
         try:
-            # 在生成时就注入长度限制，让LLM直接生成符合约束的文本
-            constraint_info = (
-                f"注意：生成的内容必须简洁，不超过{max_text_length}个字符"
-                f"（因为需要转换成语音播报），如果内容较长需要分段发送。"
-            )
-
             # 统一使用 generate_reply 以确保触发 POST_LLM 事件（日程注入）
             # rewrite_reply 不会触发 POST_LLM 事件，因此不适用
-            extra_info_parts = [constraint_info]
+            # 注意：长度约束放在末尾，利用 LLM 的"近因效应"提高遵守率
+            extra_info_parts = []
             if raw_text:
                 extra_info_parts.append(f"期望的回复内容：{raw_text}")
+            # 长度约束放在最后，使用更强的表述
+            extra_info_parts.append(
+                f"【重要】你的回复必须控制在{max_text_length}字以内，这是硬性要求。"
+                f"超过此长度将无法转换为语音。请直接回复核心内容，不要啰嗦。"
+            )
 
             success, llm_response = await generator_api.generate_reply(
                 chat_stream=self.chat_stream,
@@ -240,9 +240,11 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
         async def send_message_single_sentences() -> Tuple[bool, str]:
             result = await self._execute_backend(backend, clean_text, voice, emotion)
             if result.success:
+                # 生成更详细的动作记录，帮助 planner 避免重复执行
+                text_preview = clean_text[:80] + "..." if len(clean_text) > 80 else clean_text
                 await self.store_action_info(
                     action_build_into_prompt=True,
-                    action_prompt_display=f"[语音：{clean_text}]",
+                    action_prompt_display=f"已用语音回复：{text_preview}",
                     action_done=True
                 )
             else:
@@ -276,9 +278,13 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
 
                 # 记录动作信息
                 if success_count > 0:
+                    # 生成更详细的动作记录，帮助 planner 避免重复执行
                     display_text = "".join(all_sentences_text)
+                    text_preview = display_text[:80] + "..." if len(display_text) > 80 else display_text
                     await self.store_action_info(
-                        action_build_into_prompt=True, action_prompt_display=f"[语音：{display_text}]", action_done=True
+                        action_build_into_prompt=True,
+                        action_prompt_display=f"已用语音回复（{success_count}段）：{text_preview}",
+                        action_done=True
                     )
                     return True, f"成功发送 {success_count}/{len(sentences)} 条语音"
                 else:
@@ -308,9 +314,10 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
             if not force_trigger and not self._probability_check(final_text):
                 logger.info(f"{self.log_prefix} 概率检查未通过，使用文字回复")
                 await self.send_text(final_text)
+                text_preview = final_text[:80] + "..." if len(final_text) > 80 else final_text
                 await self.store_action_info(
                     action_build_into_prompt=True,
-                    action_prompt_display=f"回复了文字消息：{final_text[:50]}...",
+                    action_prompt_display=f"已用文字回复（语音概率未触发）：{text_preview}",
                     action_done=True
                 )
                 return True, "概率检查未通过，已发送文字回复"
@@ -329,9 +336,10 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
                     f"({len(clean_text)} > {self.max_text_length}字符)，降级为文字回复"
                 )
                 await self.send_text(clean_text)
+                text_preview = clean_text[:80] + "..." if len(clean_text) > 80 else clean_text
                 await self.store_action_info(
                     action_build_into_prompt=True,
-                    action_prompt_display="回复了文字消息（内容超过语音限制）",
+                    action_prompt_display=f"已用文字回复（内容过长）：{text_preview}",
                     action_done=True
                 )
                 return True, "内容超过语音长度限制，已改为文字回复"
@@ -517,7 +525,7 @@ class UnifiedTTSPlugin(BasePlugin):
 
     plugin_name = "tts_voice_plugin"
     plugin_description = "统一TTS语音合成插件，支持AI Voice、GSV2P、GPT-SoVITS、豆包语音多种后端"
-    plugin_version = "3.1.0"
+    plugin_version = "3.2.3"
     plugin_author = "靓仔"
     enable_plugin = True
     config_file_name = "config.toml"
@@ -539,11 +547,11 @@ class UnifiedTTSPlugin(BasePlugin):
     config_schema = {
         "plugin": {
             "enabled": ConfigField(type=bool, default=True, description="是否启用插件"),
-            "config_version": ConfigField(type=str, default="3.2.0", description="配置文件版本")
+            "config_version": ConfigField(type=str, default="3.2.3", description="配置文件版本")
         },
         "general": {
             "default_backend": ConfigField(
-                type=str, default="doubao",
+                type=str, default="cosyvoice",
                 description="默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice)"
             ),
             "timeout": ConfigField(type=int, default=60, description="请求超时时间（秒）"),
@@ -581,7 +589,7 @@ class UnifiedTTSPlugin(BasePlugin):
             "command_enabled": ConfigField(type=bool, default=True, description="是否启用Command组件")
         },
         "probability": {
-            "enabled": ConfigField(type=bool, default=True, description="是否启用概率控制"),
+            "enabled": ConfigField(type=bool, default=False, description="是否启用概率控制"),
             "base_probability": ConfigField(type=float, default=1.0, description="基础触发概率"),
             "keyword_force_trigger": ConfigField(type=bool, default=True, description="关键词强制触发"),
             "force_keywords": ConfigField(
@@ -604,9 +612,9 @@ class UnifiedTTSPlugin(BasePlugin):
             ),
             "api_token": ConfigField(type=str, default="", description="API认证Token"),
             "default_voice": ConfigField(type=str, default="原神-中文-派蒙_ZH", description="默认音色"),
-            "timeout": ConfigField(type=int, default=60, description="API请求超时（秒）"),
+            "timeout": ConfigField(type=int, default=120, description="API请求超时（秒）"),
             "model": ConfigField(type=str, default="tts-v4", description="TTS模型"),
-            "response_format": ConfigField(type=str, default="mp3", description="音频格式"),
+            "response_format": ConfigField(type=str, default="wav", description="音频格式"),
             "speed": ConfigField(type=float, default=1.0, description="语音速度")
         },
         "gpt_sovits": {
@@ -652,7 +660,7 @@ class UnifiedTTSPlugin(BasePlugin):
                 description="默认音色"
             ),
             "timeout": ConfigField(type=int, default=60, description="API请求超时（秒）"),
-            "audio_format": ConfigField(type=str, default="mp3", description="音频格式"),
+            "audio_format": ConfigField(type=str, default="wav", description="音频格式"),
             "sample_rate": ConfigField(type=int, default=24000, description="采样率"),
             "bitrate": ConfigField(type=int, default=128000, description="比特率"),
             "speed": ConfigField(type=float, default=None, description="语音速度（可选）"),
@@ -670,7 +678,7 @@ class UnifiedTTSPlugin(BasePlugin):
             ),
             "default_mode": ConfigField(
                 type=str,
-                default="自然语言控制",
+                default="3s极速复刻",
                 description="推理模式（3s极速复刻/自然语言控制）"
             ),
             "default_instruct": ConfigField(
@@ -688,7 +696,7 @@ class UnifiedTTSPlugin(BasePlugin):
                 default="",
                 description="提示文本（用于3s极速复刻模式）"
             ),
-            "timeout": ConfigField(type=int, default=120, description="API请求超时（秒）"),
+            "timeout": ConfigField(type=int, default=300, description="API请求超时（秒）"),
             "audio_format": ConfigField(type=str, default="wav", description="音频格式")
         }
     }

@@ -5,7 +5,7 @@
 
 [plugin]
 enabled = true  # 是否启用插件
-config_version = "3.2.0"  # 配置文件版本（请勿修改）
+config_version = "3.2.3"  # 配置文件版本（请勿修改）
 
 # ========================================
 # 通用设置
@@ -60,9 +60,9 @@ default_character = "邻家小妹"  # 默认音色（可选：小新、猴哥、
 api_url = "https://gsv2p.acgnai.top/v1/audio/speech"  # API地址
 api_token = ""  # API认证Token
 default_voice = "原神-中文-派蒙_ZH"  # 默认音色（格式: 游戏-语言-角色）
-timeout = 60  # 请求超时（秒）
+timeout = 120  # 请求超时（秒）
 model = "tts-v4"  # TTS模型版本
-response_format = "mp3"  # 音频格式: mp3/wav/ogg
+response_format = "wav"  # 音频格式: mp3/wav/ogg
 speed = 1  # 语音速度（1.0=正常，0.5=半速，2.0=两倍速）
 
 # ========================================
@@ -92,7 +92,7 @@ sovits_weights = "/workspace/gpt-sovits/v4/可莉_ZH/可莉_ZH_e10_s530_l32.pth"
 [doubao]
 api_url = "https://openspeech.bytedance.com/api/v3/tts/unidirectional"  # API地址
 app_id = ""  # APP ID（在豆包开放平台申请）
-access_key = ""  # Access Key
+access_key = ""  # Access token
 resource_id = "seed-tts-2.0"  # Resource ID（2.0模型支持上下文）
 default_voice = "zh_female_vv_uranus_bigtts"  # 默认音色ID
 timeout = 60  # 请求超时（秒）
@@ -109,7 +109,7 @@ bitrate = 128000  # 比特率（128000=128kbps）
 
 [cosyvoice]
 gradio_url = "https://funaudiollm-fun-cosyvoice3-0-5b.ms.show/"  # Gradio API地址
-default_mode = "自然语言控制"  # 推理模式: "3s极速复刻"/"自然语言控制"
+default_mode = "3s极速复刻"  # 推理模式: "3s极速复刻"/"自然语言控制"
 default_instruct = "You are a helpful assistant. 请用湖南话表达。<|endofprompt|>"  # 默认指令（仅自然语言控制模式生效）
 reference_audio = "/home/ubuntu/maimai/MaiBot/plugins/tts_voice_plugin/test.wav"  # 参考音频路径（3-10秒清晰人声）
 prompt_text = "不过我当下就去解决了，还行。因为我如果看到有灰尘的话，我不去清理，这样他待在那里的话，我就会特别难受。"  # 提示文本（必须与参考音频内容一致）

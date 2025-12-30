@@ -24,7 +24,7 @@ pip install aiohttp gradio_client
 
 ```toml
 [general]
-default_backend = "gsv2p"  # 可选：ai_voice / gsv2p / gpt_sovits / doubao / cosyvoice
+default_backend = "cosyvoice"  # 可选：ai_voice / gsv2p / gpt_sovits / doubao / cosyvoice
 audio_output_dir = ""          # 音频输出目录，留空使用项目根目录
 use_base64_audio = false       # 是否使用base64发送（备选方案）
 split_sentences = true         # 是否分段发送语音（长文本逐句发送）
@@ -191,8 +191,8 @@ LLM 判断需要语音回复时会自动触发，可通过概率控制：
 
 ```toml
 [probability]
-enabled = true
-base_probability = 0.3  # 30% 概率
+enabled = false          # 默认关闭，每次都触发语音
+base_probability = 0.3   # 启用时 30% 概率触发
 ```
 
 ### 智能分割插件支持
@@ -237,6 +237,16 @@ A: 设置 `send_error_messages = false`，语音合成失败时将静默处理�
 
 ## 更新日志
 
+### v3.2.3
+- 修复豆包语音 WAV 流式响应合并问题（正确处理 LIST/INFO 元数据块和多 header 情况）
+- 默认后端改为 CosyVoice（更稳定的声音克隆体验）
+- 默认关闭概率控制（每次触发都生成语音，更可预期的行为）
+- 优化 LLM 长度约束提示（利用"近因效应"提高遵守率）
+- 优化 action 记录格式，帮助 planner 避免重复执行
+- GSV2P/豆包音频格式默认改为 WAV（更好的兼容性）
+- CosyVoice 默认模式改为 3s 极速复刻（更快响应）
+- 更新默认超时配置（CosyVoice 300s, GSV2P 120s）
+
 ### v3.2.2
 - 适配智能分割插件（支持 `|||SPLIT|||` 分隔符精确分段）
 - GPT-SoVITS 支持数组格式配置（WebUI 友好，向后兼容字典格式）
@@ -265,6 +275,6 @@ A: 设置 `send_error_messages = false`，语音合成失败时将静默处理�
 
 ## 信息
 
-- 版本：3.2.2
+- 版本：3.2.3
 - 作者：靓仔
 - 许可：AGPL-v3.0
