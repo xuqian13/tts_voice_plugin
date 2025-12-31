@@ -139,7 +139,7 @@ class UnifiedTTSAction(BaseAction, TTSExecutorMixin):
 
     action_name = "unified_tts_action"
     action_description = "用语音回复（支持AI Voice/GSV2P/GPT-SoVITS/豆包语音多后端）"
-    activation_type = ActionActivationType.LLM_JUDGE
+    activation_type = ActionActivationType.KEYWORD
     mode_enable = ChatMode.ALL
     parallel_action = False
 
