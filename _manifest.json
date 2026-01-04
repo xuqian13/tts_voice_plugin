@@ -39,7 +39,7 @@
     "Accessibility"
   ],
   "host_application": {
-    "min_version": "0.11.0"
+    "min_version": "0.12.0"
   },
   "default_locale": "zh-CN",
   "plugin_info": {
