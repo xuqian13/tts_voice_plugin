@@ -131,7 +131,8 @@ class DoubaoBackend(TTSBackendBase):
             "X-Api-App-Id": app_id,
             "X-Api-Access-Key": access_key,
             "X-Api-Resource-Id": resource_id,
-            "X-Api-Request-Id": str(uuid.uuid4())
+            "X-Api-Request-Id": str(uuid.uuid4()),
+            "Accept-Encoding": "gzip, deflate"
         }
 
         # 构建请求体
