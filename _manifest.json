@@ -1,0 +1,46 @@
+{
+  "manifest_version": 2,
+  "version": "3.3.0",
+  "name": "统一TTS语音合成插件 (Unified TTS Voice Plugin)",
+  "description": "统一TTS语音合成插件，整合 AI Voice、GSV2P、GPT-SoVITS、豆包语音、CosyVoice、小米 MiMo 六种后端引擎，提供灵活的语音合成能力。",
+  "author": {
+    "name": "靓仔",
+    "url": "https://github.com/xuqian13"
+  },
+  "license": "AGPL-3.0-or-later",
+  "urls": {
+    "repository": "https://github.com/xuqian13/tts_voice_plugin",
+    "homepage": "https://github.com/xuqian13/tts_voice_plugin",
+    "documentation": "https://github.com/xuqian13/tts_voice_plugin",
+    "issues": "https://github.com/xuqian13/tts_voice_plugin/issues"
+  },
+  "host_application": {
+    "min_version": "1.0.0",
+    "max_version": "1.99.99"
+  },
+  "sdk": {
+    "min_version": "2.0.0",
+    "max_version": "2.99.99"
+  },
+  "dependencies": [
+    {
+      "type": "python_package",
+      "name": "aiohttp",
+      "version_spec": ">=3.8.0"
+    }
+  ],
+  "capabilities": [
+    "chat.get_all_streams",
+    "llm.generate",
+    "send.command",
+    "send.custom",
+    "send.text"
+  ],
+  "i18n": {
+    "default_locale": "zh-CN",
+    "supported_locales": [
+      "zh-CN"
+    ]
+  },
+  "id": "xuqian13.tts-voice-plugin"
+}
