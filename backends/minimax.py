@@ -14,7 +14,7 @@ from ..utils.file import TTSFileManager
 from ..utils.session import TTSSessionManager
 from ..config_keys import ConfigKeys
 
-logger = logging.getLogger("plugin.tts_voice_plugin.MiniMax")
+logger = logging.getLogger("plugin.tts_voice_plugin.minimax")
 
 # MiniMax 情感映射表（中文关键词 → API 情感参数）
 MINIMAX_EMOTION_MAP: Dict[str, str] = {
@@ -80,8 +80,8 @@ class MiniMaxBackend(TTSBackendBase):
     - 多种音频格式与采样率
     """
 
-    backend_name = "MiniMax"
-    backend_description = "MiniMax TTS API (MiniMax语音合成)"
+    backend_name = "minimax"
+    backend_description = "minimax TTS API"
     support_private_chat = True
     default_audio_format = "mp3"
 
@@ -93,7 +93,7 @@ class MiniMaxBackend(TTSBackendBase):
         """验证配置"""
         api_key = self.get_config(ConfigKeys.MINIMAX_API_KEY, "")
         if not api_key:
-            return False, "MiniMax TTS 后端缺少 api_key 配置"
+            return False, "minimax TTS 后端缺少 api_key 配置"
         return True, ""
 
     def _resolve_emotion(self, emotion: Optional[str]) -> Optional[str]:
@@ -131,7 +131,7 @@ class MiniMaxBackend(TTSBackendBase):
         **kwargs
     ) -> TTSResult:
         """
-        执行 MiniMax 语音合成
+        执行 minimax 语音合成
 
         API 请求格式:
         - POST https://api-bj.minimaxi.com/v1/t2a_v2
@@ -218,11 +218,11 @@ class MiniMaxBackend(TTSBackendBase):
         }
 
         logger.info(
-            "%s MiniMax请求: text='%s...' (共%d字符), voice=%s, emotion=%s, model=%s",
+            "%s minimax请求: text='%s...' (共%d字符), voice=%s, emotion=%s, model=%s",
             self.log_prefix, text[:50], len(text), voice_id, resolved_emotion or "无", model,
         )
         logger.debug(
-            "%s MiniMax完整请求参数: %s",
+            "%s minimax完整请求参数: %s",
             self.log_prefix,
             json.dumps(request_data, ensure_ascii=False, indent=2),
         )
@@ -233,10 +233,10 @@ class MiniMaxBackend(TTSBackendBase):
                 api_url,
                 json=request_data,
                 headers=headers,
-                backend_name="MiniMax",
+                backend_name="minimax",
                 timeout=timeout,
             ) as response:
-                logger.info(f"{self.log_prefix} MiniMax API响应状态码: {response.status}")
+                logger.info(f"{self.log_prefix} minimax API响应状态码: {response.status}")
 
                 if response.status == 200:
                     response_data = await response.json()
@@ -250,12 +250,12 @@ class MiniMaxBackend(TTSBackendBase):
                             base_resp.get("status_msg") or f"API返回错误码: {status_code}",
                         )
                         logger.error(
-                            "%s MiniMax API业务错误[%d]: %s",
+                            "%s minimax API业务错误[%d]: %s",
                             self.log_prefix, status_code, error_msg,
                         )
                         return TTSResult(
                             False,
-                            f"MiniMax语音{error_msg}",
+                            f"minimax语音{error_msg}",
                             backend_name=self.backend_name,
                         )
 
@@ -264,13 +264,13 @@ class MiniMaxBackend(TTSBackendBase):
                     audio_hex = data.get("audio")
                     if not audio_hex:
                         logger.error(
-                            "%s MiniMax响应缺少音频数据: %s",
+                            "%s minimax响应缺少音频数据: %s",
                             self.log_prefix,
                             json.dumps(response_data, ensure_ascii=False)[:300],
                         )
                         return TTSResult(
                             False,
-                            "MiniMax响应缺少音频数据",
+                            "minimax响应缺少音频数据",
                             backend_name=self.backend_name,
                         )
 
@@ -278,25 +278,25 @@ class MiniMaxBackend(TTSBackendBase):
                     try:
                         audio_data = bytes.fromhex(audio_hex)
                     except (ValueError, TypeError) as e:
-                        logger.error(f"{self.log_prefix} MiniMax音频hex解码失败: {e}")
+                        logger.error(f"{self.log_prefix} minimax音频hex解码失败: {e}")
                         return TTSResult(
                             False,
-                            f"MiniMax音频解码失败: {e}",
+                            f"minimax音频解码失败: {e}",
                             backend_name=self.backend_name,
                         )
 
                     # 验证音频数据
                     is_valid, error_msg = TTSFileManager.validate_audio_data(audio_data)
                     if not is_valid:
-                        logger.warning(f"{self.log_prefix} MiniMax音频数据验证失败: {error_msg}")
+                        logger.warning(f"{self.log_prefix} minimax音频数据验证失败: {error_msg}")
                         return TTSResult(
                             False,
-                            f"MiniMax语音{error_msg}",
+                            f"minimax语音{error_msg}",
                             backend_name=self.backend_name,
                         )
 
                     logger.debug(
-                        f"{self.log_prefix} MiniMax音频数据验证通过 (大小: {len(audio_data)}字节)"
+                        f"{self.log_prefix} minimax音频数据验证通过 (大小: {len(audio_data)}字节)"
                     )
 
                     # 发送音频
@@ -306,23 +306,23 @@ class MiniMaxBackend(TTSBackendBase):
                     return await self.send_audio(
                         audio_data=audio_data,
                         audio_format=audio_format,
-                        prefix="tts_MiniMax",
+                        prefix="tts_minimax",
                         voice_info=voice_info,
                     )
                 else:
                     error_text = await response.text()
                     logger.error(
-                        f"{self.log_prefix} MiniMax API请求失败[{response.status}]: {error_text[:200]}"
+                        f"{self.log_prefix} minimax API请求失败[{response.status}]: {error_text[:200]}"
                     )
                     return TTSResult(
                         False,
-                        f"MiniMax API调用失败: {response.status} - {error_text[:100]}",
+                        f"minimax API调用失败: {response.status} - {error_text[:100]}",
                         backend_name=self.backend_name,
                     )
 
         except asyncio.TimeoutError:
-            logger.error(f"{self.log_prefix} MiniMax API请求超时 (配置超时: {timeout}秒)")
-            return TTSResult(False, "MiniMax语音API调用超时", backend_name=self.backend_name)
+            logger.error(f"{self.log_prefix} minimax API请求超时 (配置超时: {timeout}秒)")
+            return TTSResult(False, "minimax语音API调用超时", backend_name=self.backend_name)
         except Exception as e:
-            logger.error(f"{self.log_prefix} MiniMax语音执行异常: {e}")
-            return TTSResult(False, f"MiniMax语音执行错误: {e}", backend_name=self.backend_name)
+            logger.error(f"{self.log_prefix} minimax语音执行异常: {e}")
+            return TTSResult(False, f"minimax语音执行错误: {e}", backend_name=self.backend_name)

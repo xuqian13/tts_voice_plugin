@@ -21,7 +21,7 @@ TTSBackendRegistry.register("gpt_sovits", GPTSoVITSBackend)
 TTSBackendRegistry.register("doubao", DoubaoBackend)
 TTSBackendRegistry.register("cosyvoice", CosyVoiceBackend)
 TTSBackendRegistry.register("mimo", MimoBackend)
-TTSBackendRegistry.register("MiniMax", MiniMaxBackend)
+TTSBackendRegistry.register("minimax", MiniMaxBackend)
 
 __all__ = [
     "TTSBackendBase",

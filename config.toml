@@ -117,10 +117,10 @@ timeout = 300  # 请求超时（秒，CosyVoice处理较慢）
 audio_format = "wav"  # 音频格式: wav/mp3
 
 # ========================================
-# MiniMax 后端配置
+# minimax 后端配置
 # ========================================
 
-[MiniMax]
+[minimax]
 api_url = "https://api-bj.minimaxi.com/v1/t2a_v2"  # API地址
 api_key = ""  # API Key（在 MiniMax 开放平台 https://platform.minimaxi.com 申请）
 model = "speech-2.8-hd"  # TTS模型: speech-2.8-hd/speech-2.8-turbo/speech-2.6-hd/speech-2.6-turbo/speech-02-hd/speech-02-turbo/speech-01-hd/speech-01-turbo
