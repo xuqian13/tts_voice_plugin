@@ -1,7 +1,7 @@
 """统一TTS语音合成插件（MaiBot SDK 2.x 版本）
 
-支持六种后端：AI Voice (MaiCore 内置) / GSV2P (云 API) / GPT-SoVITS (本地服务) /
-豆包语音 (云 API) / CosyVoice (ModelScope Gradio) / 小米 MiMo (云 API)。
+支持七种后端：AI Voice (MaiCore 内置) / GSV2P (云 API) / GPT-SoVITS (本地服务) /
+豆包语音 (云 API) / CosyVoice (ModelScope Gradio) / 小米 MiMo (云 API) / MiniMax (云 API)。
 
 本文件已迁移到新版 ``maibot_sdk`` 风格：
 - 使用 :class:`MaiBotPlugin` 作为基类。
@@ -36,7 +36,7 @@ from .utils.text import TTSTextUtils
 logger = logging.getLogger("plugin.tts_voice_plugin")
 
 # 有效后端列表
-VALID_BACKENDS: List[str] = ["ai_voice", "gsv2p", "gpt_sovits", "doubao", "cosyvoice", "mimo"]
+VALID_BACKENDS: List[str] = ["ai_voice", "gsv2p", "gpt_sovits", "doubao", "cosyvoice", "mimo", "MiniMax"]
 
 
 # ─── Pydantic 配置模型 ────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ class GeneralConfig(PluginConfigBase):
 
     default_backend: str = Field(
         default="cosyvoice",
-        description="默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice/mimo)",
+        description="默认TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice/mimo/MiniMax)",
     )
     timeout: int = Field(default=60, description="请求超时时间（秒）")
     max_text_length: int = Field(
@@ -223,6 +223,36 @@ class MiMoConfig(PluginConfigBase):
     user_context: str = Field(default="", description="可选的 user 角色上下文文本（留空不发送）")
 
 
+class MiniMaxConfig(PluginConfigBase):
+    """MiniMax 后端配置。"""
+
+    __ui_label__ = "MiniMax"
+    __ui_icon__ = "cloud"
+    __ui_order__ = 16
+
+    api_url: str = Field(
+        default="https://api-bj.minimaxi.com/v1/t2a_v2",
+        description="MiniMax TTS API 地址",
+    )
+    api_key: str = Field(default="", description="MiniMax API Key（在 MiniMax 开放平台申请）")
+    model: str = Field(
+        default="speech-2.6-hd",
+        description="TTS 模型: speech-2.8-hd/speech-2.8-turbo/speech-2.6-hd/speech-2.6-turbo/speech-02-hd/speech-02-turbo/speech-01-hd/speech-01-turbo",
+    )
+    default_voice: str = Field(
+        default="male-qn-qingse",
+        description="默认音色 ID（可在此修改为其他系统音色、复刻音色或自定义音色）",
+    )
+    timeout: int = Field(default=30, description="API 请求超时（秒）")
+    audio_format: str = Field(default="mp3", description="音频格式: mp3/pcm/flac/wav")
+    sample_rate: int = Field(default=32000, description="采样率")
+    bitrate: int = Field(default=128000, description="比特率")
+    speed: float = Field(default=1.0, description="语音速度（0.5~2.0，1.0=正常）")
+    volume: float = Field(default=1.0, description="音量（0~10，1.0=正常）")
+    pitch: int = Field(default=0, description="音调（-12~12，0=正常）")
+    channel: int = Field(default=1, description="声道数: 1=单声道, 2=立体声")
+
+
 class TTSPluginConfig(PluginConfigBase):
     """TTS 插件总配置。"""
 
@@ -236,6 +266,7 @@ class TTSPluginConfig(PluginConfigBase):
     doubao: DoubaoConfig = Field(default_factory=DoubaoConfig)
     cosyvoice: CosyVoiceConfig = Field(default_factory=CosyVoiceConfig)
     mimo: MiMoConfig = Field(default_factory=MiMoConfig)
+    MiniMax: MiniMaxConfig = Field(default_factory=MiniMaxConfig)
 
 
 # ─── 插件主体 ────────────────────────────────────────────────────────────────
@@ -532,9 +563,9 @@ class UnifiedTTSPlugin(MaiBotPlugin):
         chat_mode=ChatMode.ALL,
         action_parameters={
             "text": "要转换为语音的文本内容（必填）",
-            "backend": "TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice/mimo，可选)",
+            "backend": "TTS后端 (ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice/mimo/MiniMax，可选)",
             "voice": "音色/风格参数（可选）",
-            "emotion": "情感/语气参数（可选，豆包/小米 MiMo 后端有效）",
+            "emotion": "情感/语气参数（可选，豆包/小米 MiMo/MiniMax 后端有效）",
         },
         action_require=[
             "【优先使用】当用户明确要求用语音回复时必须使用",
@@ -746,8 +777,8 @@ class UnifiedTTSPlugin(MaiBotPlugin):
         "unified_tts_command",
         description="将文本转换为语音，支持多种后端和音色",
         pattern=(
-            r"^/(?:tts|voice|gsv2p|gptsovits|doubao|cosyvoice|mimo)\s+(?P<text>.+?)"
-            r"(?:\s+-v\s+(?P<voice>\S+))?(?:\s+(?P<backend>ai_voice|gsv2p|gpt_sovits|doubao|cosyvoice|mimo))?$"
+            r"^/(?:tts|voice|gsv2p|gptsovits|doubao|cosyvoice|mimo|MiniMax)\s+(?P<text>.+?)"
+            r"(?:\s+-v\s+(?P<voice>\S+))?(?:\s+(?P<backend>ai_voice|gsv2p|gpt_sovits|doubao|cosyvoice|mimo|MiniMax))?$"
         ),
     )
     async def handle_tts_command(
@@ -806,7 +837,7 @@ class UnifiedTTSPlugin(MaiBotPlugin):
             is_private = await self._is_private_chat(stream_id)
 
             # 对 CosyVoice / 豆包 / MiMo，-v 参数承载的是情感/方言
-            if backend_name in {"cosyvoice", "doubao", "mimo"}:
+            if backend_name in {"cosyvoice", "doubao", "mimo", "MiniMax"}:
                 result = await self._execute_backend(
                     backend_name, clean_text, stream_id, log_prefix,
                     voice="", emotion=user_voice, is_private=is_private,
@@ -848,6 +879,7 @@ class UnifiedTTSPlugin(MaiBotPlugin):
             "/cosyvoice": "cosyvoice",
             "/voice": "ai_voice",
             "/mimo": "mimo",
+            "/MiniMax": "MiniMax",
         }
         for prefix, backend_name in prefix_backend_map.items():
             if normalized.startswith(prefix):
@@ -871,14 +903,16 @@ class UnifiedTTSPlugin(MaiBotPlugin):
             "/gptsovits <文本>  使用 GPT-SoVITS\n"
             "/doubao <文本>     使用 豆包语音\n"
             "/cosyvoice <文本>  使用 CosyVoice\n"
-            "/mimo <文本>       使用 小米MiMo\n\n"
+            "/mimo <文本>       使用 小米MiMo\n"
+            "/MiniMax <文本>   使用 MiniMax\n\n"
             "🔊 可用后端：\n"
             "• ai_voice   - MaiCore内置（仅群聊）\n"
             "• gsv2p      - 云端API，高质量\n"
             "• gpt_sovits - 本地服务，可定制\n"
             "• doubao     - 火山引擎，支持情感\n"
             "• cosyvoice  - 阿里云，支持方言\n"
-            "• mimo       - 小米MiMo，支持风格/方言/唱歌\n\n"
+            "• mimo       - 小米MiMo，支持风格/方言/唱歌\n"
+            "• MiniMax    - MiniMax，支持多情感/自定义音色\n\n"
             "📌 示例：\n"
             "/tts 你好世界\n"
             "/tts 今天真开心 -v 开心\n"
@@ -886,7 +920,9 @@ class UnifiedTTSPlugin(MaiBotPlugin):
             "/doubao 我生气了 -v 生气\n"
             "/cosyvoice 你好 -v 广东话\n"
             "/voice 测试一下 -v 温柔妹妹\n"
-            "/mimo 真开心啊 -v 开心\n\n"
+            "/mimo 真开心啊 -v 开心\n"
+            "/MiniMax 你好世界\n"
+            "/MiniMax 真开心 -v 开心\n\n"
             f"⚙️ 当前默认后端：{default_backend}"
         )
         await self.ctx.send.text(help_text, stream_id)
