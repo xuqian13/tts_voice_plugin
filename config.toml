@@ -1,6 +1,6 @@
 # ========================================
 # TTS 语音合成插件配置文件
-# 整合 AI Voice、GSV2P、GPT-SoVITS、豆包语音、CosyVoice 五种后端引擎
+# 整合 AI Voice、GSV2P、GPT-SoVITS、豆包语音、CosyVoice、小米 MiMo、MiniMax 七种后端引擎
 # ========================================
 
 [plugin]
@@ -12,7 +12,7 @@ config_version = "3.2.3"  # 配置文件版本（请勿修改）
 # ========================================
 
 [general]
-default_backend = "cosyvoice"  # 默认TTS后端: ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice（推荐doubao）
+default_backend = "cosyvoice"  # 默认TTS后端: ai_voice/gsv2p/gpt_sovits/doubao/cosyvoice/mimo/MiniMax（推荐doubao）
 timeout = 60  # 请求超时时间（秒）
 max_text_length = 200  # 最大文本长度，LLM会自动生成符合长度的回复
 use_replyer_rewrite = true  # 是否使用replyer润色语音内容
@@ -115,3 +115,21 @@ reference_audio = "/home/ubuntu/maimai/MaiBot/plugins/tts_voice_plugin/test.wav"
 prompt_text = "不过我当下就去解决了，还行。因为我如果看到有灰尘的话，我不去清理，这样他待在那里的话，我就会特别难受。"  # 提示文本（必须与参考音频内容一致）
 timeout = 300  # 请求超时（秒，CosyVoice处理较慢）
 audio_format = "wav"  # 音频格式: wav/mp3
+
+# ========================================
+# minimax 后端配置
+# ========================================
+
+[minimax]
+api_url = "https://api-bj.minimaxi.com/v1/t2a_v2"  # API地址
+api_key = ""  # API Key（在 MiniMax 开放平台 https://platform.minimaxi.com 申请）
+model = "speech-2.8-hd"  # TTS模型: speech-2.8-hd/speech-2.8-turbo/speech-2.6-hd/speech-2.6-turbo/speech-02-hd/speech-02-turbo/speech-01-hd/speech-01-turbo
+default_voice = "male-qn-qingse"  # 默认音色ID（可在此修改为其他系统音色、复刻音色或自定义音色）
+timeout = 30  # 请求超时（秒）
+audio_format = "mp3"  # 音频格式: mp3/pcm/flac/wav
+sample_rate = 32000  # 采样率: 8000/16000/22050/24000/32000/44100
+bitrate = 128000  # 比特率（仅 mp3 格式生效）
+speed = 1.0  # 语音速度（0.5~2.0，1.0=正常）
+volume = 1.0  # 音量（0~10，1.0=正常）
+pitch = 0  # 音调（-12~12，0=正常）
+channel = 1  # 声道数: 1=单声道, 2=立体声

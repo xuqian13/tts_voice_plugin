@@ -84,3 +84,17 @@ class ConfigKeys:
     MIMO_AUDIO_FORMAT = "mimo.audio_format"
     MIMO_TIMEOUT = "mimo.timeout"
     MIMO_USER_CONTEXT = "mimo.user_context"
+
+    # ========== minimax 配置 ==========
+    MINIMAX_API_URL = "minimax.api_url"
+    MINIMAX_API_KEY = "minimax.api_key"
+    MINIMAX_MODEL = "minimax.model"
+    MINIMAX_DEFAULT_VOICE = "minimax.default_voice"
+    MINIMAX_TIMEOUT = "minimax.timeout"
+    MINIMAX_AUDIO_FORMAT = "minimax.audio_format"
+    MINIMAX_SAMPLE_RATE = "minimax.sample_rate"
+    MINIMAX_BITRATE = "minimax.bitrate"
+    MINIMAX_SPEED = "minimax.speed"
+    MINIMAX_VOLUME = "minimax.volume"
+    MINIMAX_PITCH = "minimax.pitch"
+    MINIMAX_CHANNEL = "minimax.channel"

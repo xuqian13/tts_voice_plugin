@@ -12,6 +12,7 @@ from .gpt_sovits import GPTSoVITSBackend
 from .doubao import DoubaoBackend
 from .cosyvoice import CosyVoiceBackend
 from .mimo import MimoBackend
+from .minimax import MiniMaxBackend
 
 # 注册后端
 TTSBackendRegistry.register("ai_voice", AIVoiceBackend)
@@ -20,6 +21,7 @@ TTSBackendRegistry.register("gpt_sovits", GPTSoVITSBackend)
 TTSBackendRegistry.register("doubao", DoubaoBackend)
 TTSBackendRegistry.register("cosyvoice", CosyVoiceBackend)
 TTSBackendRegistry.register("mimo", MimoBackend)
+TTSBackendRegistry.register("minimax", MiniMaxBackend)
 
 __all__ = [
     "TTSBackendBase",
@@ -31,4 +33,5 @@ __all__ = [
     "DoubaoBackend",
     "CosyVoiceBackend",
     "MimoBackend",
+    "MiniMaxBackend",
 ]
